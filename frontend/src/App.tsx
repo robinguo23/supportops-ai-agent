@@ -9,6 +9,7 @@ type ChatResponse = {
 type ChatMessage = {
   role: "user" | "agent";
   content: string;
+  needsHumanHandoff?: boolean;
 };
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
       const agentMessage: ChatMessage = {
         role: "agent",
         content: data.reply,
+        needsHumanHandoff: data.needs_human_handoff,
       };
 
       setMessages((previousMessages) => [...previousMessages, agentMessage]);
@@ -79,6 +81,12 @@ function App() {
           <div key={index} className={`message ${chatMessage.role}`}>
             <strong>{chatMessage.role === "user" ? "User" : "Agent"}</strong>
             <p>{chatMessage.content}</p>
+
+            {chatMessage.needsHumanHandoff && (
+              <p className="handoff-notice">
+                This conversation may need human support.
+              </p>
+            )}
           </div>
         ))}
       </section>

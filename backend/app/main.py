@@ -27,6 +27,23 @@ class ChatResponse(BaseModel):
     needs_human_handoff: bool = False
 
 
+HANDOFF_KEYWORDS = [
+    "refund",
+    "complaint",
+    "angry",
+    "human",
+    "manager",
+    "cancel",
+    "charged twice",
+    "wrong item",
+]
+
+
+def should_handoff_to_human(message: str) -> bool:
+    normalized_message = message.lower()
+    return any(keyword in normalized_message for keyword in HANDOFF_KEYWORDS)
+
+
 @app.get("/health")
 def health_check():
     return {
@@ -37,6 +54,17 @@ def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
+    needs_handoff = should_handoff_to_human(request.message)
+
+    if needs_handoff:
+        return ChatResponse(
+            reply=(
+                "I understand this may need extra support. "
+                "I will flag this conversation for a human support agent."
+            ),
+            needs_human_handoff=True,
+        )
+
     return ChatResponse(
         reply=f"You said: {request.message}",
         needs_human_handoff=False,
