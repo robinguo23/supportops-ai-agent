@@ -1,0 +1,32 @@
+.container {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 24px;
+  font-family: system-ui, sans-serif;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-top: 16px;
+}
+
+button {
+  margin-top: 12px;
+  padding: 10px 16px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.response-box {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #ddd;
+}
+
+.error-box {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #cc0000;
+}
