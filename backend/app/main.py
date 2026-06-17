@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -61,9 +62,36 @@ MOCK_ORDERS = {
 }
 
 
+MOCK_TICKETS: list[dict] = []
+
+
 def should_handoff_to_human(message: str) -> bool:
     normalized_message = message.lower()
     return any(keyword in normalized_message for keyword in HANDOFF_KEYWORDS)
+
+
+def classify_issue_type(message: str) -> str:
+    normalized_message = message.lower()
+
+    if "refund" in normalized_message:
+        return "refund_request"
+
+    if "complaint" in normalized_message or "angry" in normalized_message:
+        return "complaint"
+
+    if "cancel" in normalized_message:
+        return "cancellation"
+
+    if "wrong item" in normalized_message:
+        return "wrong_item"
+
+    if "charged twice" in normalized_message:
+        return "billing_issue"
+
+    if "human" in normalized_message or "manager" in normalized_message:
+        return "human_support_request"
+
+    return "general_support"
 
 
 def extract_order_id(message: str) -> str | None:
@@ -87,6 +115,21 @@ def check_order_status(order_id: str) -> dict:
         "order_id": order_id,
         **order,
     }
+
+
+def create_support_ticket(issue_type: str, summary: str) -> dict:
+    ticket_id = f"TCK-{len(MOCK_TICKETS) + 1001}"
+
+    ticket = {
+        "ticket_id": ticket_id,
+        "issue_type": issue_type,
+        "summary": summary,
+        "status": "open",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    MOCK_TICKETS.append(ticket)
+    return ticket
 
 
 @app.get("/health")
@@ -117,25 +160,38 @@ def chat(request: ChatRequest):
                 tool_result=tool_result,
             )
 
+        ticket = create_support_ticket(
+            issue_type="missing_order",
+            summary=f"Customer asked about unknown order ID: {order_id}",
+        )
+
         return ChatResponse(
             reply=(
                 f"I could not find order {order_id}. "
-                "Please check the order number or contact human support."
+                f"I have created support ticket {ticket['ticket_id']} for a human agent to review."
             ),
             needs_human_handoff=True,
-            tool_used="check_order_status",
-            tool_result=tool_result,
+            tool_used="create_support_ticket",
+            tool_result=ticket,
         )
 
     needs_handoff = should_handoff_to_human(request.message)
 
     if needs_handoff:
+        issue_type = classify_issue_type(request.message)
+        ticket = create_support_ticket(
+            issue_type=issue_type,
+            summary=request.message,
+        )
+
         return ChatResponse(
             reply=(
                 "I understand this may need extra support. "
-                "I will flag this conversation for a human support agent."
+                f"I have created support ticket {ticket['ticket_id']} for a human support agent."
             ),
             needs_human_handoff=True,
+            tool_used="create_support_ticket",
+            tool_result=ticket,
         )
 
     return ChatResponse(

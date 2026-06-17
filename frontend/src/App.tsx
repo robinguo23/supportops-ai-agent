@@ -13,6 +13,7 @@ type ChatMessage = {
   content: string;
   needsHumanHandoff?: boolean;
   toolUsed?: string | null;
+  ticketId?: string | null;
 };
 
 function App() {
@@ -60,6 +61,10 @@ function App() {
         content: data.reply,
         needsHumanHandoff: data.needs_human_handoff,
         toolUsed: data.tool_used,
+        ticketId:
+          data.tool_result && "ticket_id" in data.tool_result
+          ? String(data.tool_result.ticket_id)
+          : null,
       };
 
       setMessages((previousMessages) => [...previousMessages, agentMessage]);
@@ -95,6 +100,12 @@ function App() {
             {chatMessage.toolUsed && (
               <p className="tool-notice">
               Tool used: {chatMessage.toolUsed}
+              </p>
+            )}
+
+            {chatMessage.ticketId && (
+              <p className="ticket-notice">
+              Ticket ID: {chatMessage.ticketId}
               </p>
             )}
           </div>
