@@ -6,20 +6,33 @@ type ChatResponse = {
   needs_human_handoff: boolean;
 };
 
+type ChatMessage = {
+  role: "user" | "agent";
+  content: string;
+};
+
 function App() {
   const [message, setMessage] = useState("");
-  const [reply, setReply] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function sendMessage() {
-    if (!message.trim()) {
+    const trimmedMessage = message.trim();
+
+    if (!trimmedMessage) {
       return;
     }
 
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: trimmedMessage,
+    };
+
+    setMessages((previousMessages) => [...previousMessages, userMessage]);
+    setMessage("");
     setIsLoading(true);
     setErrorMessage("");
-    setReply("");
 
     try {
       const response = await fetch("http://127.0.0.1:8000/chat", {
@@ -28,7 +41,7 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: message,
+          message: trimmedMessage,
         }),
       });
 
@@ -37,7 +50,13 @@ function App() {
       }
 
       const data: ChatResponse = await response.json();
-      setReply(data.reply);
+
+      const agentMessage: ChatMessage = {
+        role: "agent",
+        content: data.reply,
+      };
+
+      setMessages((previousMessages) => [...previousMessages, agentMessage]);
     } catch (error) {
       setErrorMessage("Failed to connect to the backend.");
     } finally {
@@ -49,9 +68,20 @@ function App() {
     <main className="container">
       <h1>SupportOps AI Agent</h1>
 
-      <p>
-        Minimal frontend connected to the FastAPI backend.
-      </p>
+      <p>Minimal chat interface connected to the FastAPI backend.</p>
+
+      <section className="chat-window">
+        {messages.length === 0 && (
+          <p className="empty-state">No messages yet. Ask a support question.</p>
+        )}
+
+        {messages.map((chatMessage, index) => (
+          <div key={index} className={`message ${chatMessage.role}`}>
+            <strong>{chatMessage.role === "user" ? "User" : "Agent"}</strong>
+            <p>{chatMessage.content}</p>
+          </div>
+        ))}
+      </section>
 
       <textarea
         value={message}
@@ -63,13 +93,6 @@ function App() {
       <button onClick={sendMessage} disabled={isLoading}>
         {isLoading ? "Sending..." : "Send"}
       </button>
-
-      {reply && (
-        <section className="response-box">
-          <h2>Agent Reply</h2>
-          <p>{reply}</p>
-        </section>
-      )}
 
       {errorMessage && (
         <section className="error-box">
