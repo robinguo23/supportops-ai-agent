@@ -4,12 +4,15 @@ import "./App.css";
 type ChatResponse = {
   reply: string;
   needs_human_handoff: boolean;
+  tool_used?: string | null;
+  tool_result?: Record<string, unknown> | null;
 };
 
 type ChatMessage = {
   role: "user" | "agent";
   content: string;
   needsHumanHandoff?: boolean;
+  toolUsed?: string | null;
 };
 
 function App() {
@@ -56,6 +59,7 @@ function App() {
         role: "agent",
         content: data.reply,
         needsHumanHandoff: data.needs_human_handoff,
+        toolUsed: data.tool_used,
       };
 
       setMessages((previousMessages) => [...previousMessages, agentMessage]);
@@ -85,6 +89,12 @@ function App() {
             {chatMessage.needsHumanHandoff && (
               <p className="handoff-notice">
                 This conversation may need human support.
+              </p>
+            )}
+
+            {chatMessage.toolUsed && (
+              <p className="tool-notice">
+              Tool used: {chatMessage.toolUsed}
               </p>
             )}
           </div>

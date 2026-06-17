@@ -1,3 +1,4 @@
+import re
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -25,6 +26,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     needs_human_handoff: bool = False
+    tool_used: str | None = None
+    tool_result: dict | None = None
 
 
 HANDOFF_KEYWORDS = [
@@ -39,9 +42,51 @@ HANDOFF_KEYWORDS = [
 ]
 
 
+MOCK_ORDERS = {
+    "ORD-1001": {
+        "status": "shipped",
+        "estimated_delivery": "2026-06-20",
+        "carrier": "Royal Mail",
+    },
+    "ORD-1002": {
+        "status": "processing",
+        "estimated_delivery": "2026-06-23",
+        "carrier": "DPD",
+    },
+    "ORD-1003": {
+        "status": "delivered",
+        "estimated_delivery": "2026-06-15",
+        "carrier": "Evri",
+    },
+}
+
+
 def should_handoff_to_human(message: str) -> bool:
     normalized_message = message.lower()
     return any(keyword in normalized_message for keyword in HANDOFF_KEYWORDS)
+
+
+def extract_order_id(message: str) -> str | None:
+    match = re.search(r"ORD-\d{4}", message.upper())
+    if match:
+        return match.group(0)
+    return None
+
+
+def check_order_status(order_id: str) -> dict:
+    order = MOCK_ORDERS.get(order_id)
+
+    if order is None:
+        return {
+            "found": False,
+            "order_id": order_id,
+        }
+
+    return {
+        "found": True,
+        "order_id": order_id,
+        **order,
+    }
 
 
 @app.get("/health")
@@ -54,6 +99,34 @@ def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
+    order_id = extract_order_id(request.message)
+
+    if order_id:
+        tool_result = check_order_status(order_id)
+
+        if tool_result["found"]:
+            return ChatResponse(
+                reply=(
+                    f"I found your order {order_id}. "
+                    f"The current status is {tool_result['status']}. "
+                    f"The estimated delivery date is {tool_result['estimated_delivery']} "
+                    f"via {tool_result['carrier']}."
+                ),
+                needs_human_handoff=False,
+                tool_used="check_order_status",
+                tool_result=tool_result,
+            )
+
+        return ChatResponse(
+            reply=(
+                f"I could not find order {order_id}. "
+                "Please check the order number or contact human support."
+            ),
+            needs_human_handoff=True,
+            tool_used="check_order_status",
+            tool_result=tool_result,
+        )
+
     needs_handoff = should_handoff_to_human(request.message)
 
     if needs_handoff:
