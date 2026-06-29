@@ -42,3 +42,23 @@ def list_support_tickets(db: Session, limit: int = 20) -> list[dict]:
     )
 
     return [support_ticket_to_dict(ticket) for ticket in tickets]
+
+def update_support_ticket_status(
+    db: Session,
+    ticket_id: str,
+    status: str,
+) -> dict | None:
+    ticket = (
+        db.query(SupportTicket)
+        .filter(SupportTicket.ticket_id == ticket_id)
+        .first()
+    )
+
+    if ticket is None:
+        return None
+
+    ticket.status = status
+    db.commit()
+    db.refresh(ticket)
+
+    return support_ticket_to_dict(ticket)

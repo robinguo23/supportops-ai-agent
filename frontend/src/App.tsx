@@ -106,6 +106,27 @@ function App() {
     }
   }
 
+  async function resolveTicket(ticketId: string) {
+    setTicketErrorMessage("");
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/tickets/${ticketId}/status?status=resolved`,
+        {
+          method: "PATCH",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update ticket status");
+      }
+
+      await fetchTickets();
+    } catch (error) {
+      setTicketErrorMessage("Failed to update ticket status.");
+    }
+  }
+
   return (
     <main className="container">
       <h1>SupportOps AI Agent</h1>
@@ -182,8 +203,10 @@ function App() {
                 <th>Issue Type</th>
                 <th>Status</th>
                 <th>Summary</th>
+                <th>Action</th>
               </tr>
             </thead>
+
             <tbody>
               {tickets.map((ticket) => (
                 <tr key={ticket.ticket_id}>
@@ -191,6 +214,15 @@ function App() {
                   <td>{ticket.issue_type}</td>
                   <td>{ticket.status}</td>
                   <td>{ticket.summary}</td>
+                  <td>
+                    {ticket.status !== "resolved" ? (
+                      <button onClick={() => resolveTicket(ticket.ticket_id)}>
+                        Mark Resolved
+                      </button>
+                    ) : (
+                      <span>Resolved</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

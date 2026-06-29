@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.tools.order_tools import check_order_status, extract_order_id
-from app.tools.ticket_tools import create_support_ticket, list_support_tickets
+from app.tools.ticket_tools import (
+    create_support_ticket,
+    list_support_tickets,
+    update_support_ticket_status,
+)
 
 
 router = APIRouter()
@@ -81,4 +85,23 @@ def get_tickets(limit: int = 20, db: Session = Depends(get_db)):
 
     return {
         "tickets": tickets,
+    }
+
+@router.patch("/tickets/{ticket_id}/status")
+def update_ticket_status(
+    ticket_id: str,
+    status: str,
+    db: Session = Depends(get_db),
+):
+    updated_ticket = update_support_ticket_status(
+        db=db,
+        ticket_id=ticket_id,
+        status=status,
+    )
+
+    if updated_ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    return {
+        "ticket": updated_ticket,
     }

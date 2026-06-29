@@ -86,3 +86,25 @@ def test_list_tickets_returns_ticket_list():
     data = response.json()
     assert "tickets" in data
     assert isinstance(data["tickets"], list)
+
+def test_update_ticket_status_to_resolved():
+    create_response = client.post(
+        "/chat",
+        json={"message": "I want a refund"},
+    )
+
+    assert create_response.status_code == 200
+
+    created_data = create_response.json()
+    ticket_id = created_data["tool_result"]["ticket_id"]
+
+    update_response = client.patch(
+        f"/tickets/{ticket_id}/status",
+        params={"status": "resolved"},
+    )
+
+    assert update_response.status_code == 200
+
+    updated_data = update_response.json()
+    assert updated_data["ticket"]["ticket_id"] == ticket_id
+    assert updated_data["ticket"]["status"] == "resolved"
