@@ -66,3 +66,34 @@ button {
   font-size: 14px;
   font-weight: 600;
 }
+
+.admin-panel {
+  margin-top: 48px;
+  padding: 16px;
+  border: 1px solid #ddd;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tickets-table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+}
+
+.tickets-table th,
+.tickets-table td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tickets-table th {
+  font-weight: 600;
+}
