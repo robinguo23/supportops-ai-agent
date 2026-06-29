@@ -32,3 +32,13 @@ def create_support_ticket(db: Session, issue_type: str, summary: str) -> dict:
     db.refresh(ticket)
 
     return support_ticket_to_dict(ticket)
+
+def list_support_tickets(db: Session, limit: int = 20) -> list[dict]:
+    tickets = (
+        db.query(SupportTicket)
+        .order_by(SupportTicket.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [support_ticket_to_dict(ticket) for ticket in tickets]

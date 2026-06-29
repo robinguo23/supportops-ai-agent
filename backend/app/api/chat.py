@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.tools.order_tools import check_order_status, extract_order_id
-from app.tools.ticket_tools import create_support_ticket
+from app.tools.ticket_tools import create_support_ticket, list_support_tickets
 
 
 router = APIRouter()
@@ -74,3 +74,11 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
         reply=f"You said: {request.message}",
         needs_human_handoff=False,
     )
+
+@router.get("/tickets")
+def get_tickets(limit: int = 20, db: Session = Depends(get_db)):
+    tickets = list_support_tickets(db=db, limit=limit)
+
+    return {
+        "tickets": tickets,
+    }

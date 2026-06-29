@@ -77,3 +77,12 @@ def test_normal_message_does_not_trigger_handoff():
     assert data["tool_used"] is None
     assert data["tool_result"] is None
     assert "You said:" in data["reply"]
+
+def test_list_tickets_returns_ticket_list():
+    response = client.get("/tickets")
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "tickets" in data
+    assert isinstance(data["tickets"], list)
