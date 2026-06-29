@@ -11,7 +11,7 @@ from app.tools.ticket_tools import (
     list_support_tickets,
     update_support_ticket_status,
 )
-
+from app.tools.knowledge_chunk_tools import search_knowledge_chunks
 
 router = APIRouter()
 
@@ -117,4 +117,22 @@ def update_ticket_status(
 
     return {
         "ticket": updated_ticket,
+    }
+
+@router.get("/knowledge/search")
+def search_knowledge(
+    query: str,
+    limit: int = 3,
+    db: Session = Depends(get_db),
+):
+    chunks = search_knowledge_chunks(
+        db=db,
+        query=query,
+        limit=limit,
+    )
+
+    return {
+        "query": query,
+        "count": len(chunks),
+        "chunks": chunks,
     }

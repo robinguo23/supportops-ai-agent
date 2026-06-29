@@ -136,3 +136,31 @@ def test_delivery_question_uses_knowledge_base_search():
     assert data["needs_human_handoff"] is False
     assert data["tool_used"] == "knowledge_base_search"
     assert data["tool_result"]["article_id"] == "delivery_time"
+
+def test_search_knowledge_chunks_returns_matches():
+    response = client.get(
+        "/knowledge/search",
+        params={"query": "refund"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["query"] == "refund"
+    assert data["count"] > 0
+    assert len(data["chunks"]) > 0
+    assert "refund" in data["chunks"][0]["content"].lower()
+
+
+def test_search_knowledge_chunks_returns_empty_for_unknown_query():
+    response = client.get(
+        "/knowledge/search",
+        params={"query": "zzzzunknownterm"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["query"] == "zzzzunknownterm"
+    assert data["count"] == 0
+    assert data["chunks"] == []
