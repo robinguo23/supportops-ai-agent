@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
+from app.services.knowledge_base import search_knowledge_base
 from app.tools.order_tools import check_order_status, extract_order_id
 from app.tools.ticket_tools import (
     create_support_ticket,
@@ -74,10 +75,21 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
             tool_result=ticket,
         )
 
+    knowledge_result = search_knowledge_base(request.message)
+
+    if knowledge_result:
+        return ChatResponse(
+            reply=knowledge_result["answer"],
+            needs_human_handoff=False,
+            tool_used="knowledge_base_search",
+            tool_result=knowledge_result,
+        )
+
     return ChatResponse(
         reply=f"You said: {request.message}",
         needs_human_handoff=False,
     )
+
 
 @router.get("/tickets")
 def get_tickets(limit: int = 20, db: Session = Depends(get_db)):
@@ -86,6 +98,7 @@ def get_tickets(limit: int = 20, db: Session = Depends(get_db)):
     return {
         "tickets": tickets,
     }
+
 
 @router.patch("/tickets/{ticket_id}/status")
 def update_ticket_status(

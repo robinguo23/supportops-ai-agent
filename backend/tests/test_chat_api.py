@@ -108,3 +108,31 @@ def test_update_ticket_status_to_resolved():
     updated_data = update_response.json()
     assert updated_data["ticket"]["ticket_id"] == ticket_id
     assert updated_data["ticket"]["status"] == "resolved"
+
+def test_return_policy_uses_knowledge_base_search():
+    response = client.post(
+        "/chat",
+        json={"message": "What is your return policy?"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is False
+    assert data["tool_used"] == "knowledge_base_search"
+    assert data["tool_result"]["article_id"] == "return_policy"
+    assert "30 days" in data["reply"]
+
+
+def test_delivery_question_uses_knowledge_base_search():
+    response = client.post(
+        "/chat",
+        json={"message": "How long does delivery take?"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is False
+    assert data["tool_used"] == "knowledge_base_search"
+    assert data["tool_result"]["article_id"] == "delivery_time"
