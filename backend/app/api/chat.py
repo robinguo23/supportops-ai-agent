@@ -5,13 +5,14 @@ from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.services.knowledge_base import search_knowledge_base
+from app.tools.knowledge_chunk_tools import search_knowledge_chunks
 from app.tools.order_tools import check_order_status, extract_order_id
 from app.tools.ticket_tools import (
     create_support_ticket,
     list_support_tickets,
     update_support_ticket_status,
 )
-from app.tools.knowledge_chunk_tools import search_knowledge_chunks
+
 
 router = APIRouter()
 
@@ -75,6 +76,37 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
             tool_result=ticket,
         )
 
+    knowledge_chunks = search_knowledge_chunks(
+        db=db,
+        query=request.message,
+        limit=3,
+    )
+
+    if knowledge_chunks:
+        top_chunk = knowledge_chunks[0]
+
+        sources = [
+            {
+                "document_id": chunk["document_id"],
+                "title": chunk["title"],
+                "source": chunk["source"],
+            }
+            for chunk in knowledge_chunks
+        ]
+
+        return ChatResponse(
+            reply=(
+                "Based on our support policy:\n\n"
+                f"{top_chunk['content']}"
+            ),
+            needs_human_handoff=False,
+            tool_used="knowledge_chunk_search",
+            tool_result={
+                "matched_chunks": knowledge_chunks,
+                "sources": sources,
+            },
+        )
+
     knowledge_result = search_knowledge_base(request.message)
 
     if knowledge_result:
@@ -118,6 +150,7 @@ def update_ticket_status(
     return {
         "ticket": updated_ticket,
     }
+
 
 @router.get("/knowledge/search")
 def search_knowledge(

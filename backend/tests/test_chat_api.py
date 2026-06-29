@@ -109,7 +109,7 @@ def test_update_ticket_status_to_resolved():
     assert updated_data["ticket"]["ticket_id"] == ticket_id
     assert updated_data["ticket"]["status"] == "resolved"
 
-def test_return_policy_uses_knowledge_base_search():
+def test_return_policy_uses_database_knowledge_chunk_search():
     response = client.post(
         "/chat",
         json={"message": "What is your return policy?"},
@@ -119,12 +119,13 @@ def test_return_policy_uses_knowledge_base_search():
 
     data = response.json()
     assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_base_search"
-    assert data["tool_result"]["article_id"] == "return_policy"
-    assert "30 days" in data["reply"]
+    assert data["tool_used"] == "knowledge_chunk_search"
+    assert "sources" in data["tool_result"]
+    assert len(data["tool_result"]["sources"]) > 0
+    assert "return" in data["reply"].lower()
 
 
-def test_delivery_question_uses_knowledge_base_search():
+def test_delivery_question_uses_database_knowledge_chunk_search():
     response = client.post(
         "/chat",
         json={"message": "How long does delivery take?"},
@@ -134,8 +135,10 @@ def test_delivery_question_uses_knowledge_base_search():
 
     data = response.json()
     assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_base_search"
-    assert data["tool_result"]["article_id"] == "delivery_time"
+    assert data["tool_used"] == "knowledge_chunk_search"
+    assert "sources" in data["tool_result"]
+    assert len(data["tool_result"]["sources"]) > 0
+    assert "delivery" in data["reply"].lower()
 
 def test_search_knowledge_chunks_returns_matches():
     response = client.get(
@@ -164,3 +167,32 @@ def test_search_knowledge_chunks_returns_empty_for_unknown_query():
     assert data["query"] == "zzzzunknownterm"
     assert data["count"] == 0
     assert data["chunks"] == []
+
+def test_chat_uses_database_knowledge_chunks_for_return_policy():
+    response = client.post(
+        "/chat",
+        json={"message": "What is your return policy?"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is False
+    assert data["tool_used"] == "knowledge_chunk_search"
+    assert "sources" in data["tool_result"]
+    assert len(data["tool_result"]["sources"]) > 0
+    assert "return" in data["reply"].lower()
+
+
+def test_chat_uses_database_knowledge_chunks_for_delivery_policy():
+    response = client.post(
+        "/chat",
+        json={"message": "How long does delivery take?"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is False
+    assert data["tool_used"] == "knowledge_chunk_search"
+    assert "delivery" in data["reply"].lower()
