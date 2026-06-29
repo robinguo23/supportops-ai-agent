@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SupportTicket } from "../types";
+import { API_BASE_URL } from "../config/api";
 
 function AdminTicketsPanel() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -11,7 +12,7 @@ function AdminTicketsPanel() {
     setTicketErrorMessage("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/tickets");
+      const response = await fetch(`${API_BASE_URL}/tickets`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch tickets");
@@ -31,7 +32,7 @@ function AdminTicketsPanel() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/tickets/${ticketId}/status?status=resolved`,
+        `${API_BASE_URL}/tickets/${ticketId}/status?status=resolved`,
         {
           method: "PATCH",
         }
