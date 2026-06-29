@@ -1,20 +1,34 @@
-from datetime import datetime, timezone
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.db.models import SupportTicket
 
 
-MOCK_TICKETS: list[dict] = []
-
-
-def create_support_ticket(issue_type: str, summary: str) -> dict:
-    ticket_id = f"TCK-{len(MOCK_TICKETS) + 1001}"
-
-    ticket = {
-        "ticket_id": ticket_id,
-        "issue_type": issue_type,
-        "summary": summary,
-        "status": "open",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+def support_ticket_to_dict(ticket: SupportTicket) -> dict:
+    return {
+        "ticket_id": ticket.ticket_id,
+        "issue_type": ticket.issue_type,
+        "summary": ticket.summary,
+        "status": ticket.status,
+        "created_at": ticket.created_at.isoformat(),
     }
 
-    MOCK_TICKETS.append(ticket)
 
-    return ticket
+def generate_ticket_id(db: Session) -> str:
+    latest_id = db.query(func.max(SupportTicket.id)).scalar() or 0
+    return f"TCK-{latest_id + 1001}"
+
+
+def create_support_ticket(db: Session, issue_type: str, summary: str) -> dict:
+    ticket = SupportTicket(
+        ticket_id=generate_ticket_id(db),
+        issue_type=issue_type,
+        summary=summary,
+        status="open",
+    )
+
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+
+    return support_ticket_to_dict(ticket)

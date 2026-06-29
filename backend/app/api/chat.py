@@ -1,5 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.tools.order_tools import check_order_status, extract_order_id
@@ -10,7 +12,7 @@ router = APIRouter()
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, db: Session = Depends(get_db)):
     order_id = extract_order_id(request.message)
 
     if order_id:
@@ -30,6 +32,7 @@ def chat(request: ChatRequest):
             )
 
         ticket = create_support_ticket(
+            db=db,
             issue_type="missing_order",
             summary=f"Customer asked about unknown order ID: {order_id}",
         )
@@ -51,6 +54,7 @@ def chat(request: ChatRequest):
         issue_type = classify_issue_type(request.message)
 
         ticket = create_support_ticket(
+            db=db,
             issue_type=issue_type,
             summary=request.message,
         )
