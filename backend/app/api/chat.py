@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
+from app.services.embedding_service import generate_query_embedding
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.services.knowledge_base import search_knowledge_base
-from app.services.embedding_service import generate_query_embedding
 from app.tools.knowledge_chunk_tools import (
     search_knowledge_chunks,
     search_knowledge_chunks_by_embedding,
@@ -80,9 +80,11 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
             tool_result=ticket,
         )
 
-    knowledge_chunks = search_knowledge_chunks(
+    query_embedding = generate_query_embedding(request.message)
+
+    knowledge_chunks = search_knowledge_chunks_by_embedding(
         db=db,
-        query=request.message,
+        query_embedding=query_embedding,
         limit=3,
     )
 
@@ -94,6 +96,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 "document_id": chunk["document_id"],
                 "title": chunk["title"],
                 "source": chunk["source"],
+                "similarity": chunk["similarity"],
             }
             for chunk in knowledge_chunks
         ]
@@ -104,7 +107,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 f"{top_chunk['content']}"
             ),
             needs_human_handoff=False,
-            tool_used="knowledge_chunk_search",
+            tool_used="knowledge_vector_search",
             tool_result={
                 "matched_chunks": knowledge_chunks,
                 "sources": sources,
@@ -173,6 +176,7 @@ def search_knowledge(
         "count": len(chunks),
         "chunks": chunks,
     }
+
 
 @router.get("/knowledge/vector-search")
 def vector_search_knowledge(
