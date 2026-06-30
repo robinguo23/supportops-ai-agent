@@ -196,3 +196,30 @@ def test_chat_uses_database_knowledge_chunks_for_delivery_policy():
     assert data["needs_human_handoff"] is False
     assert data["tool_used"] == "knowledge_chunk_search"
     assert "delivery" in data["reply"].lower()
+
+def test_refund_timing_question_uses_database_knowledge_chunks():
+    response = client.post(
+        "/chat",
+        json={"message": "How long does a refund take?"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is False
+    assert data["tool_used"] == "knowledge_chunk_search"
+    assert "refund" in data["reply"].lower()
+
+
+def test_refund_request_still_creates_ticket():
+    response = client.post(
+        "/chat",
+        json={"message": "I want a refund."},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["needs_human_handoff"] is True
+    assert data["tool_used"] == "create_support_ticket"
+    assert data["tool_result"]["issue_type"] == "refund_request"
