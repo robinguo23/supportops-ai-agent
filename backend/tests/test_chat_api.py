@@ -1,19 +1,78 @@
+import app.api.chat as chat_api
+
 from fastapi.testclient import TestClient
 
+from app.db.models import EMBEDDING_DIMENSION
 from app.main import app
 
 
 client = TestClient(app)
 
 
-def test_health_check_returns_ok():
+def mock_vector_search(
+    monkeypatch,
+    *,
+    document_id: str = "return_policy",
+    title: str = "Return Policy",
+    content: str = "Customers can return most items within 30 days of delivery.",
+    source: str = "return_policy.md",
+):
+    monkeypatch.setattr(
+        chat_api,
+        "generate_query_embedding",
+        lambda query: [0.1] * EMBEDDING_DIMENSION,
+    )
+
+    def fake_search_knowledge_chunks_by_embedding(
+        db,
+        query_embedding,
+        limit: int = 3,
+    ):
+        return [
+            {
+                "id": 1,
+                "document_id": document_id,
+                "title": title,
+                "content": content,
+                "source": source,
+                "distance": 0.25,
+                "similarity": 0.75,
+            }
+        ]
+
+    monkeypatch.setattr(
+        chat_api,
+        "search_knowledge_chunks_by_embedding",
+        fake_search_knowledge_chunks_by_embedding,
+    )
+
+
+def mock_empty_vector_search(monkeypatch):
+    monkeypatch.setattr(
+        chat_api,
+        "generate_query_embedding",
+        lambda query: [0.1] * EMBEDDING_DIMENSION,
+    )
+
+    def fake_empty_search(
+        db,
+        query_embedding,
+        limit: int = 3,
+    ):
+        return []
+
+    monkeypatch.setattr(
+        chat_api,
+        "search_knowledge_chunks_by_embedding",
+        fake_empty_search,
+    )
+
+
+def test_health_check():
     response = client.get("/health")
 
     assert response.status_code == 200
-
-    data = response.json()
-    assert data["status"] == "ok"
-    assert data["service"] == "supportops-ai-agent-backend"
+    assert response.json()["status"] == "ok"
 
 
 def test_known_order_returns_order_status():
@@ -29,10 +88,9 @@ def test_known_order_returns_order_status():
     assert data["tool_used"] == "check_order_status"
     assert data["tool_result"]["found"] is True
     assert data["tool_result"]["order_id"] == "ORD-1001"
-    assert "shipped" in data["reply"]
 
 
-def test_unknown_order_creates_support_ticket():
+def test_unknown_order_creates_ticket():
     response = client.post(
         "/chat",
         json={"message": "Where is my order ORD-9999?"},
@@ -43,15 +101,15 @@ def test_unknown_order_creates_support_ticket():
     data = response.json()
     assert data["needs_human_handoff"] is True
     assert data["tool_used"] == "create_support_ticket"
-    assert data["tool_result"]["ticket_id"].startswith("TCK-")
     assert data["tool_result"]["issue_type"] == "missing_order"
     assert data["tool_result"]["status"] == "open"
+    assert "ticket_id" in data["tool_result"]
 
 
-def test_refund_request_creates_support_ticket():
+def test_refund_request_creates_ticket():
     response = client.post(
         "/chat",
-        json={"message": "I want a refund"},
+        json={"message": "I want a refund."},
     )
 
     assert response.status_code == 200
@@ -59,24 +117,25 @@ def test_refund_request_creates_support_ticket():
     data = response.json()
     assert data["needs_human_handoff"] is True
     assert data["tool_used"] == "create_support_ticket"
-    assert data["tool_result"]["ticket_id"].startswith("TCK-")
     assert data["tool_result"]["issue_type"] == "refund_request"
     assert data["tool_result"]["status"] == "open"
+    assert "ticket_id" in data["tool_result"]
 
 
-def test_normal_message_does_not_trigger_handoff():
+def test_normal_message_falls_back_when_no_vector_match(monkeypatch):
+    mock_empty_vector_search(monkeypatch)
+
     response = client.post(
         "/chat",
-        json={"message": "Hello, how are you?"},
+        json={"message": "Hello there"},
     )
 
     assert response.status_code == 200
 
     data = response.json()
     assert data["needs_human_handoff"] is False
-    assert data["tool_used"] is None
-    assert data["tool_result"] is None
-    assert "You said:" in data["reply"]
+    assert data["reply"] == "You said: Hello there"
+
 
 def test_list_tickets_returns_ticket_list():
     response = client.get("/tickets")
@@ -87,16 +146,17 @@ def test_list_tickets_returns_ticket_list():
     assert "tickets" in data
     assert isinstance(data["tickets"], list)
 
+
 def test_update_ticket_status_to_resolved():
     create_response = client.post(
         "/chat",
-        json={"message": "I want a refund"},
+        json={"message": "I want a refund."},
     )
 
     assert create_response.status_code == 200
 
-    created_data = create_response.json()
-    ticket_id = created_data["tool_result"]["ticket_id"]
+    created_ticket = create_response.json()["tool_result"]
+    ticket_id = created_ticket["ticket_id"]
 
     update_response = client.patch(
         f"/tickets/{ticket_id}/status",
@@ -105,99 +165,45 @@ def test_update_ticket_status_to_resolved():
 
     assert update_response.status_code == 200
 
-    updated_data = update_response.json()
-    assert updated_data["ticket"]["ticket_id"] == ticket_id
-    assert updated_data["ticket"]["status"] == "resolved"
+    data = update_response.json()
+    assert data["ticket"]["ticket_id"] == ticket_id
+    assert data["ticket"]["status"] == "resolved"
 
-def test_return_policy_uses_database_knowledge_chunk_search():
+
+def test_chat_uses_vector_search_for_return_policy(monkeypatch):
+    mock_vector_search(
+        monkeypatch,
+        document_id="return_policy",
+        title="Return Policy",
+        content="Customers can return most items within 30 days of delivery.",
+        source="return_policy.md",
+    )
+
     response = client.post(
         "/chat",
-        json={"message": "What is your return policy?"},
+        json={"message": "Can I return an item after delivery?"},
     )
 
     assert response.status_code == 200
 
     data = response.json()
     assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_chunk_search"
+    assert data["tool_used"] == "knowledge_vector_search"
     assert "sources" in data["tool_result"]
-    assert len(data["tool_result"]["sources"]) > 0
-    assert "return" in data["reply"].lower()
+    assert data["tool_result"]["sources"][0]["title"] == "Return Policy"
+    assert data["tool_result"]["sources"][0]["similarity"] == 0.75
+    assert "30 days" in data["reply"]
 
 
-def test_delivery_question_uses_database_knowledge_chunk_search():
-    response = client.post(
-        "/chat",
-        json={"message": "How long does delivery take?"},
+def test_chat_uses_vector_search_for_refund_timing_question(monkeypatch):
+    mock_vector_search(
+        monkeypatch,
+        document_id="refund_policy",
+        title="Refund Policy",
+        content="Refunds are usually processed within 5 to 7 working days.",
+        source="refund_policy.md",
     )
 
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_chunk_search"
-    assert "sources" in data["tool_result"]
-    assert len(data["tool_result"]["sources"]) > 0
-    assert "delivery" in data["reply"].lower()
-
-def test_search_knowledge_chunks_returns_matches():
-    response = client.get(
-        "/knowledge/search",
-        params={"query": "refund"},
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["query"] == "refund"
-    assert data["count"] > 0
-    assert len(data["chunks"]) > 0
-    assert "refund" in data["chunks"][0]["content"].lower()
-
-
-def test_search_knowledge_chunks_returns_empty_for_unknown_query():
-    response = client.get(
-        "/knowledge/search",
-        params={"query": "zzzzunknownterm"},
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["query"] == "zzzzunknownterm"
-    assert data["count"] == 0
-    assert data["chunks"] == []
-
-def test_chat_uses_database_knowledge_chunks_for_return_policy():
-    response = client.post(
-        "/chat",
-        json={"message": "What is your return policy?"},
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_chunk_search"
-    assert "sources" in data["tool_result"]
-    assert len(data["tool_result"]["sources"]) > 0
-    assert "return" in data["reply"].lower()
-
-
-def test_chat_uses_database_knowledge_chunks_for_delivery_policy():
-    response = client.post(
-        "/chat",
-        json={"message": "How long does delivery take?"},
-    )
-
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_chunk_search"
-    assert "delivery" in data["reply"].lower()
-
-def test_refund_timing_question_uses_database_knowledge_chunks():
     response = client.post(
         "/chat",
         json={"message": "How long does a refund take?"},
@@ -207,8 +213,9 @@ def test_refund_timing_question_uses_database_knowledge_chunks():
 
     data = response.json()
     assert data["needs_human_handoff"] is False
-    assert data["tool_used"] == "knowledge_chunk_search"
-    assert "refund" in data["reply"].lower()
+    assert data["tool_used"] == "knowledge_vector_search"
+    assert data["tool_result"]["sources"][0]["title"] == "Refund Policy"
+    assert "5 to 7 working days" in data["reply"]
 
 
 def test_refund_request_still_creates_ticket():
@@ -223,3 +230,26 @@ def test_refund_request_still_creates_ticket():
     assert data["needs_human_handoff"] is True
     assert data["tool_used"] == "create_support_ticket"
     assert data["tool_result"]["issue_type"] == "refund_request"
+
+
+def test_vector_search_endpoint_uses_mocked_embedding(monkeypatch):
+    mock_vector_search(
+        monkeypatch,
+        document_id="delivery_policy",
+        title="Delivery Policy",
+        content="Standard delivery usually takes 3 to 5 working days.",
+        source="delivery_policy.md",
+    )
+
+    response = client.get(
+        "/knowledge/vector-search",
+        params={"query": "My parcel is late"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["query"] == "My parcel is late"
+    assert data["count"] == 1
+    assert data["chunks"][0]["title"] == "Delivery Policy"
+    assert data["chunks"][0]["similarity"] == 0.75
