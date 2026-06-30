@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.embedding_service import generate_query_embedding
-from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.services.knowledge_base import search_knowledge_base
 from app.tools.knowledge_chunk_tools import (
     search_knowledge_chunks,
@@ -19,6 +19,37 @@ from app.tools.ticket_tools import (
 
 
 router = APIRouter()
+
+
+MIN_RAG_SIMILARITY = 0.60
+
+
+SUPPORT_DOMAIN_TERMS = (
+    "order",
+    "orders",
+    "return",
+    "returns",
+    "refund",
+    "refunds",
+    "delivery",
+    "shipping",
+    "parcel",
+    "item",
+    "items",
+    "damaged",
+    "faulty",
+    "broken",
+    "cancel",
+    "payment",
+    "charged",
+    "address",
+)
+
+
+class EscalationRequest(BaseModel):
+    original_question: str
+    reason: str | None = None
+
 
 def clean_chunk_content(content: str) -> str:
     cleaned_lines = []
@@ -42,6 +73,28 @@ def build_policy_reply(top_chunk: dict) -> str:
         f"{cleaned_content}"
     )
 
+
+def is_support_domain_query(message: str) -> bool:
+    normalized_message = message.lower()
+
+    return any(
+        term in normalized_message
+        for term in SUPPORT_DOMAIN_TERMS
+    )
+
+
+def build_sources(knowledge_chunks: list[dict]) -> list[dict]:
+    return [
+        {
+            "document_id": chunk["document_id"],
+            "title": chunk["title"],
+            "source": chunk["source"],
+            "similarity": chunk.get("similarity"),
+        }
+        for chunk in knowledge_chunks
+    ]
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, db: Session = Depends(get_db)):
     order_id = extract_order_id(request.message)
@@ -59,46 +112,41 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 ),
                 needs_human_handoff=False,
                 tool_used="check_order_status",
-                tool_result=tool_result,
+                tool_result={
+                    **tool_result,
+                    "conversation_action": "ask_resolution_feedback",
+                    "original_query": request.message,
+                },
             )
-
-        ticket = create_support_ticket(
-            db=db,
-            issue_type="missing_order",
-            summary=f"Customer asked about unknown order ID: {order_id}",
-        )
 
         return ChatResponse(
             reply=(
                 f"I could not find order {order_id}. "
-                f"I have created support ticket {ticket['ticket_id']} "
-                "for a human agent to review."
+                "Would you like to request human support for this issue?"
             ),
-            needs_human_handoff=True,
-            tool_used="create_support_ticket",
-            tool_result=ticket,
+            needs_human_handoff=False,
+            tool_used="order_not_found",
+            tool_result={
+                "reason": "order_not_found",
+                "order_id": order_id,
+                "conversation_action": "ask_escalation",
+                "original_query": request.message,
+            },
         )
 
-    needs_handoff = should_handoff_to_human(request.message)
-
-    if needs_handoff:
-        issue_type = classify_issue_type(request.message)
-
-        ticket = create_support_ticket(
-            db=db,
-            issue_type=issue_type,
-            summary=request.message,
-        )
-
+    if not is_support_domain_query(request.message):
         return ChatResponse(
             reply=(
-                "I understand this may need extra support. "
-                f"I have created support ticket {ticket['ticket_id']} "
-                "for a human support agent."
+                "I can only help with support questions about orders, returns, "
+                "refunds, delivery, or damaged items."
             ),
-            needs_human_handoff=True,
-            tool_used="create_support_ticket",
-            tool_result=ticket,
+            needs_human_handoff=False,
+            tool_used="out_of_scope_guardrail",
+            tool_result={
+                "reason": "out_of_scope",
+                "conversation_action": "allow_new_question",
+                "original_query": request.message,
+            },
         )
 
     query_embedding = generate_query_embedding(request.message)
@@ -111,27 +159,36 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
 
     if knowledge_chunks:
         top_chunk = knowledge_chunks[0]
+        top_similarity = top_chunk.get("similarity", 0)
+        sources = build_sources(knowledge_chunks)
 
-        sources = [
-            {
-                "document_id": chunk["document_id"],
-                "title": chunk["title"],
-                "source": chunk["source"],
-                "similarity": chunk["similarity"],
-            }
-            for chunk in knowledge_chunks
-        ]
+        if top_similarity >= MIN_RAG_SIMILARITY:
+            return ChatResponse(
+                reply=build_policy_reply(top_chunk),
+                needs_human_handoff=False,
+                tool_used="knowledge_vector_search",
+                tool_result={
+                    "matched_chunks": knowledge_chunks,
+                    "sources": sources,
+                    "min_similarity": MIN_RAG_SIMILARITY,
+                    "conversation_action": "ask_resolution_feedback",
+                    "original_query": request.message,
+                },
+            )
 
         return ChatResponse(
             reply=(
-                "Based on our support policy:\n\n"
-                f"{top_chunk['content']}"
+                "I could not find a strong enough support policy match for this question. "
+                "Would you like to request human support?"
             ),
             needs_human_handoff=False,
             tool_used="knowledge_vector_search",
             tool_result={
                 "matched_chunks": knowledge_chunks,
-                "sources": sources,
+                "min_similarity": MIN_RAG_SIMILARITY,
+                "reason": "top_similarity_below_threshold",
+                "conversation_action": "ask_escalation",
+                "original_query": request.message,
             },
         )
 
@@ -142,13 +199,50 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
             reply=knowledge_result["answer"],
             needs_human_handoff=False,
             tool_used="knowledge_base_search",
-            tool_result=knowledge_result,
+            tool_result={
+                **knowledge_result,
+                "conversation_action": "ask_resolution_feedback",
+                "original_query": request.message,
+            },
         )
 
     return ChatResponse(
-        reply=f"You said: {request.message}",
+        reply=(
+            "I could not find a relevant support policy for this question. "
+            "Would you like to request human support?"
+        ),
         needs_human_handoff=False,
+        tool_used="knowledge_search_no_match",
+        tool_result={
+            "reason": "no_relevant_policy_found",
+            "conversation_action": "ask_escalation",
+            "original_query": request.message,
+        },
     )
+
+
+@router.post("/tickets/escalate")
+def escalate_to_human(
+    request: EscalationRequest,
+    db: Session = Depends(get_db),
+):
+    ticket = create_support_ticket(
+        db=db,
+        issue_type="human_escalation",
+        summary=(
+            f"Customer requested human support. "
+            f"Original question: {request.original_question}"
+        ),
+    )
+
+    return {
+        "message": (
+            f"I have created support ticket {ticket['ticket_id']} "
+            "for a human support agent."
+        ),
+        "ticket": ticket,
+        "reason": request.reason,
+    }
 
 
 @router.get("/tickets")

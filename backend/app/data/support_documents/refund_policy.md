@@ -9,3 +9,5 @@ If the refund has not arrived after 10 working days, the customer should contact
 Refunds may be delayed if the returned item is damaged, incomplete, or missing original packaging.
 
 Shipping fees may not always be refundable, depending on the reason for the return.
+
+This policy is mainly about refund timing, refund processing, refund delays, and refund payment method.
