@@ -5,7 +5,11 @@ from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.handoff import classify_issue_type, should_handoff_to_human
 from app.services.knowledge_base import search_knowledge_base
-from app.tools.knowledge_chunk_tools import search_knowledge_chunks
+from app.services.embedding_service import generate_query_embedding
+from app.tools.knowledge_chunk_tools import (
+    search_knowledge_chunks,
+    search_knowledge_chunks_by_embedding,
+)
 from app.tools.order_tools import check_order_status, extract_order_id
 from app.tools.ticket_tools import (
     create_support_ticket,
@@ -161,6 +165,26 @@ def search_knowledge(
     chunks = search_knowledge_chunks(
         db=db,
         query=query,
+        limit=limit,
+    )
+
+    return {
+        "query": query,
+        "count": len(chunks),
+        "chunks": chunks,
+    }
+
+@router.get("/knowledge/vector-search")
+def vector_search_knowledge(
+    query: str,
+    limit: int = 3,
+    db: Session = Depends(get_db),
+):
+    query_embedding = generate_query_embedding(query)
+
+    chunks = search_knowledge_chunks_by_embedding(
+        db=db,
+        query_embedding=query_embedding,
         limit=limit,
     )
 

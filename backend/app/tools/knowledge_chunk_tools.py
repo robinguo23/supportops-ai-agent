@@ -68,6 +68,16 @@ def calculate_chunk_score(chunk: KnowledgeChunk, search_terms: list[str]) -> int
     return score
 
 
+def format_knowledge_chunk(chunk: KnowledgeChunk) -> dict:
+    return {
+        "id": chunk.id,
+        "document_id": chunk.document_id,
+        "title": chunk.title,
+        "content": chunk.content,
+        "source": chunk.source,
+    }
+
+
 def search_knowledge_chunks(
     db: Session,
     query: str,
@@ -100,12 +110,39 @@ def search_knowledge_chunks(
     )
 
     return [
-        {
-            "id": chunk.id,
-            "document_id": chunk.document_id,
-            "title": chunk.title,
-            "content": chunk.content,
-            "source": chunk.source,
-        }
+        format_knowledge_chunk(chunk)
         for chunk in ranked_chunks[:limit]
     ]
+
+
+def search_knowledge_chunks_by_embedding(
+    db: Session,
+    query_embedding: list[float],
+    limit: int = 3,
+) -> list[dict]:
+    distance_expression = KnowledgeChunk.embedding.cosine_distance(
+        query_embedding
+    )
+
+    results = (
+        db.query(
+            KnowledgeChunk,
+            distance_expression.label("distance"),
+        )
+        .order_by(distance_expression)
+        .limit(limit)
+        .all()
+    )
+
+    chunks = []
+
+    for chunk, distance in results:
+        distance_value = float(distance)
+
+        chunk_data = format_knowledge_chunk(chunk)
+        chunk_data["distance"] = distance_value
+        chunk_data["similarity"] = 1 - distance_value
+
+        chunks.append(chunk_data)
+
+    return chunks
