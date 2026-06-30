@@ -4,9 +4,11 @@
 
 SupportOps AI Agent is a full-stack customer support assistant prototype.
 
-The system allows users to ask support questions through a React chat interface. The backend uses FastAPI, PostgreSQL, pgvector, and Gemini embeddings to retrieve relevant support policy documents and return grounded answers. If the user is not satisfied with the answer, they can explicitly request human support, which creates a support ticket.
+The system allows users to ask support questions through a React chat interface. The backend uses FastAPI, PostgreSQL, pgvector, Gemini embeddings, and DeepSeek-V4-Flash to retrieve relevant support policy documents and generate grounded customer support answers.
 
-<small>中文说明：这是一个全栈 AI 客服系统原型。用户通过前端聊天提问，后端用 RAG 检索客服政策文档并回答。只有用户明确请求人工支持时，系统才创建 ticket。</small>
+If the user is not satisfied with the answer, they can explicitly request human support, which creates a support ticket.
+
+<small>中文说明：这是一个全栈 AI 客服系统原型。用户通过前端聊天提问，后端用 RAG 检索客服政策文档，再用 DeepSeek 基于检索结果生成自然回答。只有用户明确请求人工支持时，系统才创建 ticket。</small>
 
 ---
 
@@ -16,24 +18,25 @@ The system allows users to ask support questions through a React chat interface.
 React Frontend
     ↓
 FastAPI Backend
+    ├── Gemini Embedding API
+    ├── DeepSeek-V4-Flash Answer Generation
     ↓
 PostgreSQL
     ├── support_tickets
     └── knowledge_chunks + pgvector embeddings
-    ↓
-Gemini Embedding API
 ```
 
 The main components are:
 
-* React frontend for chat interaction and ticket administration;
-* FastAPI backend for API routes and business logic;
-* PostgreSQL for persistent support tickets and knowledge chunks;
-* pgvector for semantic similarity search;
-* Gemini embedding service for document and query embeddings;
-* Markdown support documents as the source knowledge base.
+- React frontend for chat interaction and ticket administration;
+- FastAPI backend for API routes and business logic;
+- PostgreSQL for persistent support tickets and knowledge chunks;
+- pgvector for semantic similarity search;
+- Gemini embedding service for document and query embeddings;
+- DeepSeek-V4-Flash for grounded answer generation;
+- Markdown support documents as the source knowledge base.
 
-<small>中文说明：系统由 React 前端、FastAPI 后端、PostgreSQL 数据库、pgvector 向量检索、Gemini embedding 和本地 Markdown 知识库组成。</small>
+<small>中文说明：系统由 React 前端、FastAPI 后端、PostgreSQL 数据库、pgvector 向量检索、Gemini embedding、DeepSeek 生成层和本地 Markdown 知识库组成。</small>
 
 ---
 
@@ -43,12 +46,14 @@ The frontend is built with React and TypeScript.
 
 Main responsibilities:
 
-* display chat messages;
-* send user questions to `/chat`;
-* display RAG answers, sources, and similarity scores;
-* manage feedback buttons such as `Yes, solved`, `Continue asking`, and `No, I need help`;
-* call `/tickets/escalate` only when the user explicitly requests human support;
-* display and update support tickets in the admin panel.
+- display chat messages;
+- send user questions to `/chat`;
+- display generated RAG answers, sources, and similarity scores;
+- manage feedback buttons such as `Yes, solved` and `No, I need help`;
+- keep the input box available after normal RAG answers;
+- deactivate old feedback buttons when the user continues typing;
+- call `/tickets/escalate` only when the user explicitly requests human support;
+- display and update support tickets in the admin panel.
 
 Key files:
 
@@ -62,7 +67,7 @@ frontend/src/
     └── AdminTicketsPanel.tsx
 ```
 
-<small>中文说明：前端负责聊天展示、按钮状态、人工转接触发、source 展示和 admin ticket 面板。</small>
+<small>中文说明：前端负责聊天展示、source 展示、按钮状态、非阻塞式反馈逻辑、人工转接触发和 admin ticket 面板。</small>
 
 ---
 
@@ -72,14 +77,15 @@ The backend is built with FastAPI.
 
 Main responsibilities:
 
-* receive chat messages;
-* check order IDs;
-* detect out-of-scope questions;
-* generate query embeddings;
-* retrieve relevant knowledge chunks with pgvector;
-* return grounded support answers with source metadata;
-* create tickets only through explicit escalation;
-* provide ticket listing and ticket status update APIs.
+- receive chat messages;
+- check order IDs;
+- detect out-of-scope questions;
+- generate query embeddings;
+- retrieve relevant knowledge chunks with pgvector;
+- generate grounded answers using DeepSeek-V4-Flash;
+- return support answers with source metadata;
+- create tickets only through explicit escalation;
+- provide ticket listing and ticket status update APIs.
 
 Key backend structure:
 
@@ -96,6 +102,7 @@ backend/app/
 ├── models/
 │   └── chat.py
 ├── services/
+│   ├── answer_generation_service.py
 │   ├── document_chunking.py
 │   ├── embedding_service.py
 │   └── knowledge_base.py
@@ -105,7 +112,7 @@ backend/app/
     └── ticket_tools.py
 ```
 
-<small>中文说明：后端负责核心业务逻辑，包括订单查询、RAG 检索、out-of-scope 判断、ticket escalation 和 ticket 管理。</small>
+<small>中文说明：后端负责核心业务逻辑，包括订单查询、RAG 检索、DeepSeek 生成、out-of-scope 判断、ticket escalation 和 ticket 管理。</small>
 
 ---
 
@@ -119,12 +126,12 @@ Stores human support tickets.
 
 Main fields:
 
-* `id`
-* `ticket_id`
-* `issue_type`
-* `summary`
-* `status`
-* `created_at`
+- `id`
+- `ticket_id`
+- `issue_type`
+- `summary`
+- `status`
+- `created_at`
 
 Tickets are only created when the user explicitly requests human support through the escalation flow.
 
@@ -136,13 +143,13 @@ Stores support policy document chunks and embeddings.
 
 Main fields:
 
-* `id`
-* `document_id`
-* `title`
-* `content`
-* `source`
-* `embedding`
-* `created_at`
+- `id`
+- `document_id`
+- `title`
+- `content`
+- `source`
+- `embedding`
+- `created_at`
 
 The `embedding` column uses pgvector with 1536 dimensions.
 
@@ -152,7 +159,7 @@ The `embedding` column uses pgvector with 1536 dimensions.
 
 ## 6. RAG Pipeline
 
-The RAG pipeline contains two stages: document ingestion and query-time retrieval.
+The RAG pipeline contains two stages: document ingestion and query-time retrieval/generation.
 
 ### 6.1 Document Ingestion
 
@@ -173,19 +180,26 @@ The ingestion script reads these documents, splits them into chunks, generates e
 
 <small>中文说明：文档写成 Markdown，然后切分成 chunks，调用 Gemini 生成 embedding，再写入 PostgreSQL。</small>
 
-### 6.2 Query-Time Retrieval
+### 6.2 Query-Time Retrieval and Generation
 
 ```text
 User question
 → Gemini query embedding
 → pgvector cosine similarity search
-→ retrieve top matching chunks
+→ retrieve top matching policy chunks
+→ DeepSeek-V4-Flash grounded answer generation
 → return answer with source metadata
 ```
 
-The backend uses pgvector cosine distance to rank knowledge chunks by semantic similarity.
+The retrieval layer first finds relevant support policy chunks from PostgreSQL using pgvector cosine similarity search.
 
-<small>中文说明：用户提问后，后端把问题转成 query embedding，再用 pgvector 和数据库里的 chunk embeddings 做相似度检索。</small>
+The generation layer then sends the retrieved chunks to DeepSeek-V4-Flash and asks the model to generate a concise customer support answer using only the retrieved context.
+
+The LLM does not replace retrieval. It only turns retrieved support policy context into a more natural response.
+
+The frontend still displays source metadata and similarity scores from the retrieved chunks.
+
+<small>中文说明：现在系统是完整 RAG：先检索文档，再把检索结果交给 DeepSeek 生成自然回答。LLM 不替代检索，只负责把检索到的政策内容讲成人话。</small>
 
 ---
 
@@ -213,39 +227,37 @@ If support-related:
     retrieve policy chunks using pgvector
 ↓
 If top similarity >= threshold:
-    return RAG answer with sources
+    generate grounded answer with DeepSeek
+    return answer with sources
     ask whether the answer solved the issue
 ↓
 If top similarity < threshold:
     ask whether the user wants human support
 ```
 
-<small>中文说明：/chat 的核心逻辑是：先查订单，再判断是否支持范围内，再做 RAG 检索。只有用户明确转人工才创建 ticket。</small>
+<small>中文说明：/chat 的核心逻辑是：先查订单，再判断是否支持范围内，再做 RAG 检索，最后用 DeepSeek 基于检索结果生成回答。只有用户明确转人工才创建 ticket。</small>
 
 ---
 
 ## 8. Feedback-Based Escalation Flow
 
-The system uses a feedback-based escalation workflow.
+The system uses a non-blocking feedback-based escalation workflow.
 
 After a RAG answer, the frontend shows:
 
 ```text
 Yes, solved
-Continue asking
 No, I need help
 ```
+
+The input box remains available after a RAG answer. This allows the user to naturally continue the conversation, ask follow-up questions, or provide missing information such as an order ID.
+
+If the user continues typing, the previous feedback buttons are automatically deactivated.
 
 If the user clicks `Yes, solved`:
 
 ```text
-The system thanks the user and closes the current conversation.
-```
-
-If the user clicks `Continue asking`:
-
-```text
-The input box is unlocked and the user can ask a follow-up question.
+The system thanks the user and closes the current issue.
 ```
 
 If the user clicks `No, I need help`:
@@ -261,6 +273,8 @@ Request human support
 End chat
 ```
 
+Only this escalation confirmation stage locks the input box.
+
 Only `Request human support` calls:
 
 ```text
@@ -269,7 +283,7 @@ POST /tickets/escalate
 
 and creates a support ticket.
 
-<small>中文说明：系统不是看到 refund、damaged、charged twice 就自动建 ticket，而是先用 RAG 回答，再让用户选择是否解决。只有用户点击人工支持时才建 ticket。</small>
+<small>中文说明：RAG 回答后不会锁输入框，用户可以继续追问或补充订单号。只有进入人工转接确认阶段时才锁输入框，防止误创建 ticket。</small>
 
 ---
 
@@ -287,10 +301,11 @@ Who is the Prime Minister?
 
 For these questions, the system should:
 
-* not answer from support policy documents;
-* not show irrelevant sources;
-* not create a ticket;
-* allow the user to ask a new support-related question.
+- not answer from support policy documents;
+- not call answer generation unnecessarily;
+- not show irrelevant sources;
+- not create a ticket;
+- allow the user to ask a new support-related question.
 
 <small>中文说明：天气、笑话、政治人物这类问题不属于客服范围。系统不应该乱答，也不应该创建 ticket。</small>
 
@@ -342,16 +357,16 @@ The backend test suite verifies the main support workflow.
 
 Important behaviours tested:
 
-* health check works;
-* known order returns order status;
-* unknown order asks for escalation but does not create a ticket;
-* out-of-scope questions do not create tickets;
-* refund, damaged item, and billing issues use RAG and do not automatically create tickets;
-* only `/tickets/escalate` creates a ticket;
-* ticket listing and status update work;
-* vector search tests mock embedding generation to avoid real Gemini API calls.
+- health check works;
+- known order returns order status;
+- unknown order asks for escalation but does not create a ticket;
+- out-of-scope questions do not create tickets;
+- refund, damaged item, and billing issues use RAG and do not automatically create tickets;
+- only `/tickets/escalate` creates a ticket;
+- ticket listing and status update work;
+- vector search tests mock embedding generation to avoid real Gemini API calls.
 
-<small>中文说明：测试重点验证新的业务规则：RAG 回答不自动建 ticket，只有用户明确人工转接才建 ticket。</small>
+<small>中文说明：测试重点验证新的业务规则：RAG 回答不自动建 ticket，只有用户明确人工转接才建 ticket。测试里也 mock 外部 AI 调用，避免测试依赖真实 API。</small>
 
 ---
 
@@ -363,17 +378,35 @@ The project already uses PostgreSQL for support ticket persistence. Using pgvect
 
 <small>中文说明：选择 pgvector 是因为项目已经使用 PostgreSQL，这样 ticket 数据和向量检索都在同一个数据库里，更容易解释和部署。</small>
 
-### Why Gemini embeddings?
+### Why Gemini Embeddings?
 
-Gemini embeddings can output 1536-dimensional vectors, matching the current `vector(1536)` database schema.
+Gemini embeddings are used to convert support policy chunks and user queries into vectors for semantic retrieval. The project uses 1536-dimensional embeddings, matching the current `vector(1536)` database schema.
 
-<small>中文说明：选择 Gemini embedding 是因为可以输出 1536 维，和当前数据库表结构匹配。</small>
+<small>中文说明：Gemini 负责把文档和用户问题转成 embedding，用于 pgvector 相似度检索。</small>
 
-### Why feedback-based escalation?
+### Why DeepSeek for Answer Generation?
+
+The project uses Gemini for embeddings and DeepSeek-V4-Flash for answer generation.
+
+Gemini embeddings are used for semantic retrieval over support policy documents. DeepSeek is used only after retrieval, to generate a customer-friendly answer grounded in the retrieved chunks.
+
+This separates retrieval from generation and keeps the system explainable.
+
+<small>中文说明：Gemini 负责 embedding 和检索，DeepSeek 负责基于检索结果生成自然回答。这样职责分离，系统更容易解释。</small>
+
+### Why Feedback-Based Escalation?
 
 Automatically creating tickets from keywords can produce noisy or unnecessary tickets. The feedback-based workflow first attempts self-service resolution through RAG and escalates only after explicit user confirmation.
 
 <small>中文说明：反馈式转人工更真实。系统先尝试用知识库解决问题，只有用户确认需要人工时才创建 ticket。</small>
+
+### Why Non-Blocking RAG Feedback?
+
+After a RAG answer, users may still want to continue the conversation or provide missing information. For example, if the assistant asks for an order ID, the user should be able to type it directly.
+
+Therefore, the frontend does not lock the input after a normal RAG answer. It only locks the input during explicit human escalation confirmation.
+
+<small>中文说明：RAG 回答后用户可能还要继续补充信息，所以这时不锁输入框。只有人工转接确认阶段才锁输入框。</small>
 
 ---
 
@@ -381,15 +414,15 @@ Automatically creating tickets from keywords can produce noisy or unnecessary ti
 
 Current limitations include:
 
-* no real authentication;
-* no multi-user conversation persistence;
-* no production deployment;
-* no LLM answer generation beyond returning retrieved chunks;
-* support documents are manually written Markdown files;
-* conversation state is currently managed on the frontend;
-* no advanced retrieval evaluation dataset yet.
+- no real authentication;
+- no multi-user conversation persistence;
+- no production deployment;
+- support documents are manually written Markdown files;
+- conversation state is currently managed on the frontend;
+- no advanced retrieval evaluation dataset yet;
+- no strict automated hallucination evaluation yet.
 
-<small>中文说明：当前项目还是原型，没有认证、多用户会话持久化、生产部署，也还没有完整的检索评估集。</small>
+<small>中文说明：当前项目还是原型，没有认证、多用户会话持久化、生产部署，也还没有完整的检索和生成质量评估集。</small>
 
 ---
 
@@ -397,13 +430,13 @@ Current limitations include:
 
 Possible next improvements:
 
-* persist conversations and messages in PostgreSQL;
-* add authentication for admin ticket management;
-* improve document chunking strategy;
-* add retrieval evaluation queries;
-* generate natural answers from retrieved chunks using an LLM;
-* add deployment with Docker;
-* add CI tests;
-* improve frontend design and accessibility.
+- persist conversations and messages in PostgreSQL;
+- add authentication for admin ticket management;
+- improve document chunking strategy;
+- add retrieval evaluation queries;
+- add stricter hallucination checks for generated answers;
+- add deployment with Docker;
+- add CI tests;
+- improve frontend design and accessibility.
 
-<small>中文说明：后续可以做会话持久化、认证、检索评估、LLM 生成回答、Docker 部署和 CI 测试。</small>
+<small>中文说明：后续可以做会话持久化、认证、检索评估、生成质量评估、Docker 部署和 CI 测试。</small>

@@ -1,8 +1,8 @@
 # SupportOps AI Agent
 
-A full-stack AI customer support assistant prototype built with React, FastAPI, PostgreSQL, pgvector, and Gemini embeddings.
+A full-stack AI customer support assistant prototype built with React, FastAPI, PostgreSQL, pgvector, Gemini embeddings, and DeepSeek-V4-Flash.
 
-The system answers support-related customer questions using a RAG-style retrieval pipeline over local support policy documents. It retrieves relevant policy chunks from PostgreSQL using pgvector semantic search, returns source-aware answers, and only creates human support tickets after explicit user escalation.
+The system answers customer support questions using a RAG pipeline over local support policy documents. It retrieves relevant policy chunks from PostgreSQL using pgvector semantic search, generates grounded customer-friendly answers with DeepSeek-V4-Flash, displays source metadata and similarity scores, and only creates human support tickets after explicit user escalation.
 
 ---
 
@@ -12,14 +12,18 @@ SupportOps AI Agent is designed as a customer support workflow prototype.
 
 It supports:
 
-* policy question answering through RAG retrieval;
-* order status lookup using backend tools;
-* source-aware answers with similarity scores;
-* feedback-based escalation;
-* human support ticket creation;
-* admin ticket viewing and status updates.
+- RAG-based support question answering;
+- grounded LLM answer generation from retrieved policy chunks;
+- order status lookup using backend tools;
+- source-aware answers with similarity scores;
+- non-blocking feedback after RAG answers;
+- explicit human support escalation;
+- support ticket creation;
+- admin ticket viewing and status updates.
 
-The project focuses on building an explainable support workflow rather than a generic chatbot. The assistant first attempts to resolve support questions using retrieved policy documents. If the answer does not solve the issue, the user can explicitly request human support, which creates a support ticket.
+The project focuses on building an explainable support workflow rather than a generic chatbot.
+
+The assistant first attempts to resolve support questions using retrieved policy documents. The retrieved policy chunks are then passed to DeepSeek-V4-Flash to generate a more natural customer support answer. If the answer does not solve the issue, the user can explicitly request human support, which creates a support ticket.
 
 ---
 
@@ -29,11 +33,11 @@ The project focuses on building an explainable support workflow rather than a ge
 
 The backend retrieves relevant support policy chunks using:
 
-* local Markdown support documents;
-* document chunking;
-* Gemini-generated embeddings;
-* PostgreSQL + pgvector;
-* cosine similarity search.
+- local Markdown support documents;
+- document chunking;
+- Gemini-generated embeddings;
+- PostgreSQL + pgvector;
+- cosine similarity search.
 
 Example user question:
 
@@ -41,19 +45,31 @@ Example user question:
 Can I return an item after delivery?
 ```
 
-Example response:
+Example generated answer:
 
 ```text
-Based on our support policy: Return Policy
-
-Customers can return most items within 30 days of delivery.
+Yes, you can return most items within 30 days of delivery, as long as they are unused, undamaged, and in their original packaging. Please include your order ID when contacting support about the return.
 ```
 
 The frontend also displays source metadata and similarity scores.
 
 ---
 
-### Feedback-Based Escalation Flow
+### Grounded LLM Answer Generation
+
+The backend uses a two-stage RAG flow.
+
+First, it retrieves relevant support policy chunks from PostgreSQL using Gemini embeddings and pgvector semantic search.
+
+Then, it sends the retrieved chunks to DeepSeek-V4-Flash to generate a more natural customer support answer.
+
+The LLM does not replace retrieval. It only generates the final response based on the retrieved support policy context.
+
+This keeps answers more natural while still grounding them in company policy documents.
+
+---
+
+### Non-Blocking Feedback-Based Escalation Flow
 
 After a support answer, the frontend asks whether the answer solved the issue.
 
@@ -61,11 +77,16 @@ The user can choose:
 
 ```text
 Yes, solved
-Continue asking
 No, I need help
 ```
 
+The input box remains available after a RAG answer, so the user can naturally ask a follow-up question or provide missing information such as an order ID.
+
+If the user continues typing, the previous feedback buttons are automatically deactivated.
+
 If the user chooses `No, I need help`, the system asks whether they want human support.
+
+Only during this explicit escalation confirmation stage is the input box locked.
 
 Only when the user clicks `Request human support` does the backend create a ticket.
 
@@ -79,9 +100,9 @@ Support tickets are stored in PostgreSQL.
 
 The admin panel can:
 
-* list support tickets;
-* view ticket summaries;
-* update ticket status from `open` to `resolved`.
+- list support tickets;
+- view ticket summaries;
+- update ticket status from `open` to `resolved`.
 
 Tickets are created only through the explicit escalation endpoint:
 
@@ -95,12 +116,12 @@ POST /tickets/escalate
 
 The assistant only handles support-related questions about:
 
-* orders;
-* returns;
-* refunds;
-* delivery;
-* damaged items;
-* billing issues.
+- orders;
+- returns;
+- refunds;
+- delivery;
+- damaged items;
+- billing issues.
 
 Out-of-scope questions such as weather or jokes are rejected without creating tickets.
 
@@ -113,7 +134,7 @@ What is the weather today?
 Response:
 
 ```text
-I can only help with support questions about orders, returns, refunds, delivery, or damaged items.
+I can only help with support questions about orders, returns, refunds, delivery, damaged items, or billing issues.
 ```
 
 ---
@@ -122,34 +143,37 @@ I can only help with support questions about orders, returns, refunds, delivery,
 
 ### Frontend
 
-* React
-* TypeScript
-* Vite
-* CSS
+- React
+- TypeScript
+- Vite
+- CSS
 
 ### Backend
 
-* FastAPI
-* Python
-* Pydantic
-* SQLAlchemy
+- FastAPI
+- Python
+- Pydantic
+- SQLAlchemy
 
 ### Database
 
-* PostgreSQL
-* pgvector
+- PostgreSQL
+- pgvector
 
 ### AI / Retrieval
 
-* Gemini Embedding API
-* 1536-dimensional embeddings
-* pgvector cosine similarity search
+- Gemini Embedding API
+- DeepSeek-V4-Flash chat generation
+- 1536-dimensional embeddings
+- PostgreSQL + pgvector
+- cosine similarity search
+- grounded answer generation from retrieved support policy chunks
 
 ### Testing
 
-* pytest
-* FastAPI TestClient
-* mocked embedding/vector search for stable tests
+- pytest
+- FastAPI TestClient
+- mocked embedding/vector search for stable tests
 
 ---
 
@@ -159,23 +183,24 @@ I can only help with support questions about orders, returns, refunds, delivery,
 React Frontend
     ↓
 FastAPI Backend
+    ├── Gemini Embedding API
+    ├── DeepSeek-V4-Flash Answer Generation
     ↓
 PostgreSQL
     ├── support_tickets
     └── knowledge_chunks + pgvector embeddings
-    ↓
-Gemini Embedding API
 ```
 
 Main backend responsibilities:
 
-* receive chat messages;
-* detect order IDs;
-* detect out-of-scope questions;
-* generate query embeddings;
-* retrieve relevant document chunks with pgvector;
-* return grounded support answers;
-* create tickets only through explicit escalation.
+- receive chat messages;
+- detect order IDs;
+- detect out-of-scope questions;
+- generate query embeddings;
+- retrieve relevant document chunks with pgvector;
+- generate grounded answers from retrieved chunks;
+- return source metadata and similarity scores;
+- create tickets only through explicit escalation.
 
 For more detail, see:
 
@@ -206,7 +231,7 @@ Markdown support documents
 
 The ingestion script reads the documents, splits them into chunks, generates embeddings, and inserts them into PostgreSQL.
 
-### Query-Time Retrieval
+### Query-Time Retrieval and Generation
 
 At query time:
 
@@ -215,10 +240,13 @@ User question
 → Gemini query embedding
 → pgvector cosine similarity search
 → retrieve top matching chunks
-→ return answer with source metadata
+→ DeepSeek-V4-Flash answer generation
+→ return grounded answer with source metadata
 ```
 
-The system returns the most relevant support policy chunk and source metadata.
+The system first retrieves relevant support policy chunks from PostgreSQL. Then DeepSeek-V4-Flash generates a customer-friendly answer using only the retrieved policy context.
+
+The frontend still displays source metadata and similarity scores from the retrieval layer.
 
 ---
 
@@ -239,6 +267,7 @@ supportops-ai-agent/
 │   │   ├── models/
 │   │   │   └── chat.py
 │   │   ├── services/
+│   │   │   ├── answer_generation_service.py
 │   │   │   ├── document_chunking.py
 │   │   │   ├── embedding_service.py
 │   │   │   └── knowledge_base.py
@@ -300,6 +329,10 @@ DATABASE_URL=postgresql://supportops:supportops_dev_password@localhost:5433/supp
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_EMBEDDING_MODEL=gemini-embedding-2
 GEMINI_EMBEDDING_DIMENSION=1536
+
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_CHAT_MODEL=deepseek-v4-flash
 ```
 
 Do not commit the real `.env` file.
@@ -405,15 +438,15 @@ python -m pytest -q
 
 The test suite verifies:
 
-* health check;
-* known order lookup;
-* unknown order escalation prompt;
-* out-of-scope guardrail;
-* RAG answers without automatic ticket creation;
-* explicit escalation ticket creation;
-* ticket listing;
-* ticket status update;
-* vector search endpoint behaviour.
+- health check;
+- known order lookup;
+- unknown order escalation prompt;
+- out-of-scope guardrail;
+- RAG answers without automatic ticket creation;
+- explicit escalation ticket creation;
+- ticket listing;
+- ticket status update;
+- vector search endpoint behaviour.
 
 Embedding and vector search are mocked in tests to avoid relying on the real Gemini API during automated test runs.
 
@@ -434,20 +467,16 @@ Can I return an item after delivery?
 Expected:
 
 ```text
-Return Policy answer
+Generated return policy answer
 Sources shown
 Similarity score shown
 ```
 
-### 2. Continue Asking
+### 2. Natural Follow-Up
 
-Click:
+After the RAG answer, the input box remains available.
 
-```text
-Continue asking
-```
-
-Then ask:
+Ask:
 
 ```text
 How long does a refund take?
@@ -456,10 +485,40 @@ How long does a refund take?
 Expected:
 
 ```text
-Refund Policy answer
+Generated refund policy answer
+Sources shown
+Similarity score shown
 ```
 
-### 3. Out-of-Scope Guardrail
+### 3. Missing Information Follow-Up
+
+Ask:
+
+```text
+I want to return my shoes.
+```
+
+Expected:
+
+```text
+Generated answer asking for relevant return information, such as order ID
+Input box remains available
+User can continue typing the order ID directly
+```
+
+Then ask:
+
+```text
+My order ID is ORD-1001.
+```
+
+Expected:
+
+```text
+Order status lookup response
+```
+
+### 4. Out-of-Scope Guardrail
 
 Ask:
 
@@ -474,7 +533,7 @@ Out-of-scope message
 No ticket created
 ```
 
-### 4. Refund Request
+### 5. Explicit Human Escalation
 
 Ask:
 
@@ -485,7 +544,7 @@ I want a refund.
 Expected:
 
 ```text
-Refund Request Policy answer
+Generated refund policy answer
 No ticket created automatically
 ```
 
@@ -502,7 +561,7 @@ Expected:
 Support ticket created
 ```
 
-### 5. Admin Panel
+### 6. Admin Panel
 
 Check the admin panel:
 
@@ -523,9 +582,23 @@ The project already uses PostgreSQL for support tickets. pgvector allows semanti
 
 Gemini embeddings can generate 1536-dimensional vectors, which match the project’s `vector(1536)` schema in PostgreSQL.
 
+### Why DeepSeek for Answer Generation?
+
+The project uses Gemini for embeddings and DeepSeek-V4-Flash for answer generation.
+
+Gemini embeddings are used for semantic retrieval over support policy documents. DeepSeek is used only after retrieval, to generate a customer-friendly answer grounded in the retrieved chunks.
+
+This separates retrieval from generation and keeps the system explainable.
+
 ### Why Feedback-Based Escalation?
 
 Automatically creating tickets from keywords can create noisy and unnecessary support tickets. The feedback-based flow first tries to resolve the issue using RAG and only escalates after explicit user confirmation.
+
+### Why Non-Blocking RAG Feedback?
+
+After a RAG answer, users may still want to continue the conversation or provide missing information. For example, if the assistant asks for an order ID, the user should be able to type it directly.
+
+Therefore, the frontend does not lock the input after a normal RAG answer. It only locks the input during explicit human escalation confirmation.
 
 ### Why Mock External AI Calls in Tests?
 
@@ -537,14 +610,13 @@ Tests should be fast, deterministic, and safe to run without consuming API quota
 
 This is still a prototype. Current limitations include:
 
-* no authentication;
-* no user accounts;
-* no multi-user conversation persistence;
-* conversation state is currently managed on the frontend;
-* support documents are manually written Markdown files;
-* no production deployment;
-* no full LLM answer generation beyond retrieved chunk formatting;
-* no advanced retrieval evaluation dataset yet.
+- no authentication;
+- no user accounts;
+- no multi-user conversation persistence;
+- conversation state is currently managed on the frontend;
+- support documents are manually written Markdown files;
+- no production deployment;
+- no advanced retrieval evaluation dataset yet.
 
 ---
 
@@ -552,19 +624,21 @@ This is still a prototype. Current limitations include:
 
 Possible future improvements:
 
-* persist conversations and messages in PostgreSQL;
-* add authentication for admin ticket management;
-* add retrieval evaluation queries;
-* improve chunking strategy;
-* generate more natural answers using an LLM over retrieved chunks;
-* add Dockerized full-stack deployment;
-* add CI testing;
-* improve UI design and accessibility.
+- persist conversations and messages in PostgreSQL;
+- add authentication for admin ticket management;
+- add retrieval evaluation queries;
+- improve chunking strategy;
+- add stricter hallucination checks for generated answers;
+- add Dockerized full-stack deployment;
+- add CI testing;
+- improve UI design and accessibility.
 
 ---
 
 ## 14. Interview Summary
 
-This project demonstrates a full-stack AI support workflow with a real RAG retrieval backend.
+This project demonstrates a full-stack AI support workflow with a real RAG retrieval and generation backend.
 
-I built a React and FastAPI customer support assistant that stores support tickets in PostgreSQL and retrieves policy documents using Gemini embeddings and pgvector. I designed a feedback-based escalation flow so tickets are only created after explicit user confirmation. I also added source-aware responses, similarity scores, out-of-scope guardrails, and mocked backend tests to keep the system reliable and explainable.
+I built a React and FastAPI customer support assistant that stores support tickets in PostgreSQL and retrieves policy documents using Gemini embeddings and pgvector. The retrieved policy chunks are passed to DeepSeek-V4-Flash to generate grounded, customer-friendly answers.
+
+I designed a feedback-based escalation flow so users can continue asking follow-up questions after a RAG answer, while tickets are only created after explicit human support confirmation. I also added source-aware responses, similarity scores, out-of-scope guardrails, and mocked backend tests to keep the system reliable and explainable.
