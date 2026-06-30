@@ -214,6 +214,15 @@ export default function ChatPanel() {
     });
   }
 
+  function handleContinueAsking(messageId: string) {
+    deactivateActionButtons(messageId);
+    setPendingAction(null);
+
+    addAssistantMessage({
+      content: "Sure — please ask your follow-up question.",
+    });
+  }
+
   function handleNotResolved(messageId: string, originalQuery: string) {
     deactivateActionButtons(messageId);
 
@@ -373,7 +382,15 @@ export default function ChatPanel() {
                       onClick={() => handleResolved(message.id)}
                       disabled={isLoading}
                     >
-                      Yes
+                      Yes, solved
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleContinueAsking(message.id)}
+                      disabled={isLoading}
+                    >
+                      Continue asking
                     </button>
 
                     <button
@@ -383,7 +400,7 @@ export default function ChatPanel() {
                       }
                       disabled={isLoading}
                     >
-                      No
+                      No, I need help
                     </button>
                   </div>
                 )}
