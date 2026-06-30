@@ -66,12 +66,12 @@ export default function ChatPanel() {
     null
   );
 
-  const isInputLocked = pendingAction !== null;
+ const isInputLocked = pendingAction?.type === "escalation";
 
   useEffect(() => {
-    if (!pendingAction) {
-      return;
-    }
+  if (!pendingAction || pendingAction.type !== "escalation") {
+    return;
+  }
 
     const timeoutId = window.setTimeout(() => {
       deactivateActionButtons(pendingAction.messageId);
@@ -125,6 +125,10 @@ export default function ChatPanel() {
 
     if (!trimmedInput || isLoading || isInputLocked) {
       return;
+    }
+    if (pendingAction?.type === "resolution_feedback") {
+        deactivateActionButtons(pendingAction.messageId);
+        setPendingAction(null);
     }
 
     const userMessage: ChatMessage = {
@@ -211,15 +215,6 @@ export default function ChatPanel() {
     addAssistantMessage({
       content:
         "Glad I could help. This conversation is now closed. You can start a new support question.",
-    });
-  }
-
-  function handleContinueAsking(messageId: string) {
-    deactivateActionButtons(messageId);
-    setPendingAction(null);
-
-    addAssistantMessage({
-      content: "Sure — please ask your follow-up question.",
     });
   }
 
@@ -385,13 +380,6 @@ export default function ChatPanel() {
                       Yes, solved
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleContinueAsking(message.id)}
-                      disabled={isLoading}
-                    >
-                      Continue asking
-                    </button>
 
                     <button
                       type="button"
