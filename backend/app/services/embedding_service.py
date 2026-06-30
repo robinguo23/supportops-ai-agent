@@ -1,10 +1,15 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 from app.db.models import EMBEDDING_DIMENSION
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(BACKEND_DIR / ".env", override=True)
 
 
 load_dotenv()
