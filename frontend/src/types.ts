@@ -1,16 +1,26 @@
+export type ToolSource = {
+  document_id: string;
+  title: string;
+  source: string;
+  similarity?: number;
+};
+
 export type ChatResponse = {
   reply: string;
   needs_human_handoff: boolean;
   tool_used?: string | null;
-  tool_result?: Record<string, unknown> | null;
+  tool_result?: {
+    matched_chunks?: unknown[];
+    sources?: ToolSource[];
+    [key: string]: unknown;
+  } | null;
 };
 
 export type ChatMessage = {
-  role: "user" | "agent";
+  role: "user" | "assistant";
   content: string;
-  needsHumanHandoff?: boolean;
   toolUsed?: string | null;
-  ticketId?: string | null;
+  toolResult?: ChatResponse["tool_result"];
 };
 
 export type SupportTicket = {
@@ -18,5 +28,5 @@ export type SupportTicket = {
   issue_type: string;
   summary: string;
   status: string;
-  created_at: string;
+  created_at?: string;
 };

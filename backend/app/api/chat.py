@@ -20,6 +20,27 @@ from app.tools.ticket_tools import (
 
 router = APIRouter()
 
+def clean_chunk_content(content: str) -> str:
+    cleaned_lines = []
+
+    for line in content.splitlines():
+        stripped_line = line.strip()
+
+        if stripped_line.startswith("#"):
+            continue
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines).strip()
+
+
+def build_policy_reply(top_chunk: dict) -> str:
+    cleaned_content = clean_chunk_content(top_chunk["content"])
+
+    return (
+        f"Based on our support policy: {top_chunk['title']}\n\n"
+        f"{cleaned_content}"
+    )
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, db: Session = Depends(get_db)):
