@@ -148,7 +148,7 @@ resource "aws_lb_listener_rule" "backend" {
 
   condition {
     path_pattern {
-      values = ["/chat", "/tickets*", "/knowledge*", "/db/*"]
+      values = ["/chat", "/tickets*", "/knowledge*", "/db/*", "/security-api*"]
     }
   }
 }

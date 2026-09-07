@@ -71,6 +71,22 @@ resource "aws_ecs_task_definition" "backend" {
           value = var.cors_allowed_origins
         },
         {
+          name  = "AWS_REGION"
+          value = var.aws_region
+        },
+        {
+          name  = "WAF_WEB_ACL_NAME"
+          value = aws_wafv2_web_acl.application.name
+        },
+        {
+          name  = "WAF_WEB_ACL_ID"
+          value = aws_wafv2_web_acl.application.id
+        },
+        {
+          name  = "WAF_LOG_GROUP_NAME"
+          value = aws_cloudwatch_log_group.waf.name
+        },
+        {
           name  = "PGHOST"
           value = aws_db_instance.database.address
         },

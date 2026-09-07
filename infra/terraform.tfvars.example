@@ -26,3 +26,6 @@ database_skip_final_snapshot   = true
 
 chat_rate_limit       = 100
 waf_log_retention_days = 14
+
+# The security API is denied to everyone until a trusted public /32 is supplied.
+# security_admin_ipv4_cidrs = ["203.0.113.10/32"]

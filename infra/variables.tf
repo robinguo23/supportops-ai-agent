@@ -182,3 +182,9 @@ variable "waf_log_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "security_admin_ipv4_cidrs" {
+  description = "Trusted public IPv4 CIDRs allowed to access /security-api; empty blocks everyone"
+  type        = list(string)
+  default     = []
+}

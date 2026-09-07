@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.chat import router as chat_router
+from app.api.security import router as security_router
 from app.db.init_db import init_db
 from app.db.session import SessionLocal
 
@@ -68,3 +69,4 @@ def database_health_check():
 
 
 app.include_router(chat_router)
+app.include_router(security_router)
