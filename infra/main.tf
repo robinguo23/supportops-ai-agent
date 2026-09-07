@@ -8,6 +8,7 @@ locals {
   }
 
   application_secret_arns = compact([
+    aws_db_instance.database.master_user_secret[0].secret_arn,
     var.database_url_secret_arn,
     var.gemini_api_key_secret_arn,
     var.deepseek_api_key_secret_arn,

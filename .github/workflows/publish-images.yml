@@ -1,0 +1,88 @@
+name: Publish container images
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional immutable image tag; defaults to the selected commit SHA
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and push to ECR
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: eu-west-2
+      BACKEND_REPOSITORY: supportops-dev-backend
+      FRONTEND_REPOSITORY: supportops-dev-frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Configure temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+          role-session-name: supportops-image-publish
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.7
+
+      - name: Select immutable image tag
+        id: metadata
+        env:
+          REQUESTED_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [ -n "$REQUESTED_TAG" ]; then
+            IMAGE_TAG="$REQUESTED_TAG"
+          else
+            IMAGE_TAG="$GITHUB_SHA"
+          fi
+
+          if ! [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid container image tag: $IMAGE_TAG" >&2
+            exit 1
+          fi
+
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.metadata.outputs.image_tag }}
+        run: |
+          docker build             --tag "$REGISTRY/$BACKEND_REPOSITORY:$IMAGE_TAG"             ./backend
+          docker push "$REGISTRY/$BACKEND_REPOSITORY:$IMAGE_TAG"
+
+      - name: Build and push frontend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.metadata.outputs.image_tag }}
+        run: |
+          docker build             --build-arg VITE_API_BASE_URL=             --tag "$REGISTRY/$FRONTEND_REPOSITORY:$IMAGE_TAG"             ./frontend
+          docker push "$REGISTRY/$FRONTEND_REPOSITORY:$IMAGE_TAG"
+
+      - name: Add workflow summary
+        env:
+          IMAGE_TAG: ${{ steps.metadata.outputs.image_tag }}
+        run: |
+          {
+            echo "## Published SupportOps images"
+            echo
+            echo "Immutable tag: `$IMAGE_TAG`"
+            echo
+            echo "Use this value for Terraform variable `image_tag`."
+          } >> "$GITHUB_STEP_SUMMARY"

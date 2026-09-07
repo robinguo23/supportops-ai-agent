@@ -18,6 +18,11 @@ output "public_subnet_ids" {
   value       = aws_subnet.public[*].id
 }
 
+output "database_subnet_ids" {
+  description = "Private subnet IDs used by RDS"
+  value       = aws_subnet.database[*].id
+}
+
 output "alb_dns_name" {
   description = "Public DNS name of the application load balancer"
   value       = aws_lb.application.dns_name
@@ -41,4 +46,19 @@ output "frontend_ecr_repository_url" {
 output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = aws_ecs_cluster.main.name
+}
+
+output "database_endpoint" {
+  description = "Private RDS PostgreSQL endpoint"
+  value       = aws_db_instance.database.endpoint
+}
+
+output "database_master_secret_arn" {
+  description = "Secrets Manager ARN containing the generated RDS credentials"
+  value       = aws_db_instance.database.master_user_secret[0].secret_arn
+}
+
+output "github_image_publisher_role_arn" {
+  description = "Set this value as the GitHub Actions variable AWS_PUBLISH_ROLE_ARN"
+  value       = aws_iam_role.github_image_publisher.arn
 }

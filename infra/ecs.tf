@@ -69,10 +69,36 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "CORS_ALLOWED_ORIGINS"
           value = var.cors_allowed_origins
+        },
+        {
+          name  = "PGHOST"
+          value = aws_db_instance.database.address
+        },
+        {
+          name  = "PGPORT"
+          value = tostring(aws_db_instance.database.port)
+        },
+        {
+          name  = "PGDATABASE"
+          value = var.database_name
         }
       ]
 
       secrets = concat(
+        [
+          {
+            name = "PGUSER"
+            valueFrom = (
+              "${aws_db_instance.database.master_user_secret[0].secret_arn}:username::"
+            )
+          },
+          {
+            name = "PGPASSWORD"
+            valueFrom = (
+              "${aws_db_instance.database.master_user_secret[0].secret_arn}:password::"
+            )
+          }
+        ],
         var.database_url_secret_arn == null ? [] : [
           {
             name      = "DATABASE_URL"
