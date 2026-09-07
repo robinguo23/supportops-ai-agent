@@ -7,12 +7,16 @@ This directory defines the AWS deployment foundation for SupportOps with Terrafo
 - A dedicated VPC across two Availability Zones
 - Two public subnets for the ALB and Fargate tasks
 - Two private database subnets with no internet route
-- An internet-facing Application Load Balancer
+- An internet-facing Application Load Balancer protected by a regional AWS WAF web ACL
 - Separate frontend and backend ECS Fargate services
 - A private, encrypted RDS for PostgreSQL instance
 - AWS-managed RDS master credentials in Secrets Manager
 - Separate immutable ECR repositories with scan-on-push
 - Security groups that allow container ingress only from the ALB and database ingress only from the backend
+- AWS managed common-threat, known-bad-input, SQL injection, and IP reputation rules
+- A custom per-IP rate limit scoped to `/chat`
+- Blocked-request WAF logs with authorization and cookie headers redacted
+- A CloudWatch security dashboard for WAF metrics and recent blocked events
 - CloudWatch application and PostgreSQL logs
 - A least-privilege GitHub Actions OIDC role that can push only to the two application repositories
 
@@ -46,4 +50,4 @@ terraform validate
 
 The backend receives the RDS host as environment configuration and the generated username/password through ECS secret injection. A full `DATABASE_URL` remains available as an optional override.
 
-HTTPS, AWS WAF, WAF logging, remote Terraform state, and automated ECS rollout are intentionally added in later stages.
+HTTPS, remote Terraform state, automated ECS rollout, and the React security operations view are intentionally added in later stages.

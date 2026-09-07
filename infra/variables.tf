@@ -165,3 +165,20 @@ variable "github_oidc_thumbprint" {
   type        = string
   default     = "6938fd4d98bab03faadb97b34396831e3780aea1"
 }
+
+variable "chat_rate_limit" {
+  description = "Maximum requests from one source IP to /chat in a five-minute window"
+  type        = number
+  default     = 100
+
+  validation {
+    condition     = var.chat_rate_limit >= 10
+    error_message = "Chat rate limit must be at least 10 requests."
+  }
+}
+
+variable "waf_log_retention_days" {
+  description = "Retention period for blocked-request WAF logs"
+  type        = number
+  default     = 14
+}
