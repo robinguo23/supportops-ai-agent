@@ -61,8 +61,62 @@ variable "backend_desired_count" {
   }
 }
 
+variable "database_name" {
+  description = "Initial PostgreSQL database name"
+  type        = string
+  default     = "supportops"
+}
+
+variable "database_master_username" {
+  description = "RDS master username; the password is generated and managed by AWS"
+  type        = string
+  default     = "supportops_admin"
+}
+
+variable "database_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "database_allocated_storage" {
+  description = "Initial RDS storage in GiB"
+  type        = number
+  default     = 20
+}
+
+variable "database_max_allocated_storage" {
+  description = "Maximum RDS autoscaled storage in GiB"
+  type        = number
+  default     = 50
+}
+
+variable "database_multi_az" {
+  description = "Deploy a standby database in another Availability Zone"
+  type        = bool
+  default     = false
+}
+
+variable "database_backup_retention_days" {
+  description = "Number of days to retain automated database backups"
+  type        = number
+  default     = 1
+}
+
+variable "database_deletion_protection" {
+  description = "Protect the RDS instance from accidental deletion"
+  type        = bool
+  default     = false
+}
+
+variable "database_skip_final_snapshot" {
+  description = "Skip a final snapshot when deleting the RDS instance"
+  type        = bool
+  default     = true
+}
+
 variable "database_url_secret_arn" {
-  description = "Optional Secrets Manager ARN containing the backend DATABASE_URL"
+  description = "Optional Secrets Manager ARN containing a full DATABASE_URL override"
   type        = string
   default     = null
   nullable    = true
@@ -98,4 +152,16 @@ variable "enable_deletion_protection" {
   description = "Protect the ALB from accidental deletion"
   type        = bool
   default     = false
+}
+
+variable "github_repository" {
+  description = "GitHub repository allowed to publish application images"
+  type        = string
+  default     = "robinguo23/supportops-ai-agent"
+}
+
+variable "github_oidc_thumbprint" {
+  description = "SHA-1 thumbprint for the GitHub Actions OIDC provider certificate"
+  type        = string
+  default     = "6938fd4d98bab03faadb97b34396831e3780aea1"
 }

@@ -2,15 +2,24 @@ aws_region   = "eu-west-2"
 project_name = "supportops"
 environment  = "dev"
 
-vpc_cidr         = "10.20.0.0/16"
+vpc_cidr          = "10.20.0.0/16"
 alb_ingress_cidrs = ["0.0.0.0/0"]
-image_tag         = "bootstrap"
+image_tag          = "bootstrap"
 
-# Leave both at zero until the ECR images and backend secrets are ready.
+# Leave both at zero until the ECR images are published.
 frontend_desired_count = 0
 backend_desired_count  = 0
 
-# Store real values in AWS Secrets Manager. Reference only their ARNs here.
-# database_url_secret_arn     = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/database-url"
+database_name                  = "supportops"
+database_master_username       = "supportops_admin"
+database_instance_class        = "db.t4g.micro"
+database_allocated_storage     = 20
+database_max_allocated_storage = 50
+database_multi_az              = false
+database_backup_retention_days = 1
+database_deletion_protection   = false
+database_skip_final_snapshot   = true
+
+# Store optional AI API keys in AWS Secrets Manager and reference only their ARNs.
 # gemini_api_key_secret_arn   = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/gemini-api-key"
 # deepseek_api_key_secret_arn = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/deepseek-api-key"
