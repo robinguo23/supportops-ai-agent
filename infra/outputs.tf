@@ -62,3 +62,18 @@ output "github_image_publisher_role_arn" {
   description = "Set this value as the GitHub Actions variable AWS_PUBLISH_ROLE_ARN"
   value       = aws_iam_role.github_image_publisher.arn
 }
+
+output "waf_web_acl_arn" {
+  description = "ARN of the regional AWS WAF web ACL"
+  value       = aws_wafv2_web_acl.application.arn
+}
+
+output "waf_log_group_name" {
+  description = "CloudWatch log group containing blocked WAF requests"
+  value       = aws_cloudwatch_log_group.waf.name
+}
+
+output "security_dashboard_name" {
+  description = "CloudWatch security dashboard name"
+  value       = aws_cloudwatch_dashboard.security.dashboard_name
+}
