@@ -20,7 +20,7 @@ function AdminTicketsPanel() {
 
       const data: { tickets: SupportTicket[] } = await response.json();
       setTickets(data.tickets);
-    } catch (error) {
+    } catch {
       setTicketErrorMessage("Failed to load support tickets.");
     } finally {
       setIsLoadingTickets(false);
@@ -43,7 +43,7 @@ function AdminTicketsPanel() {
       }
 
       await fetchTickets();
-    } catch (error) {
+    } catch {
       setTicketErrorMessage("Failed to update ticket status.");
     }
   }
