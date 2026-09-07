@@ -284,7 +284,7 @@ export default function ChatPanel() {
         toolUsed: "create_support_ticket",
         toolResult: {
           ticket: data.ticket,
-          reason: data.reason,
+          reason: data.reason ?? undefined,
         },
       });
 
