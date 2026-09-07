@@ -10,6 +10,15 @@ node_modules/
 dist/
 build/
 
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+*.tfplan
+crash.log
+crash.*.log
+
 # OS / editor
 .DS_Store
 .vscode/
