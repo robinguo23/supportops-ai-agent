@@ -1,3 +1,15 @@
+resource "aws_wafv2_ip_set" "security_admin" {
+  name               = "${local.name_prefix}-security-admin"
+  description        = "Trusted IPv4 addresses allowed to read security operations data"
+  scope              = "REGIONAL"
+  ip_address_version = "IPV4"
+  addresses          = var.security_admin_ipv4_cidrs
+
+  tags = {
+    Name = "${local.name_prefix}-security-admin"
+  }
+}
+
 resource "aws_wafv2_web_acl" "application" {
   name        = "${local.name_prefix}-web-acl"
   description = "Regional protections for the SupportOps application"
@@ -41,6 +53,51 @@ resource "aws_wafv2_web_acl" "application" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${local.name_prefix}-chat-rate-limit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "RestrictSecurityApi"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      and_statement {
+        statement {
+          byte_match_statement {
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/security-api"
+
+            field_to_match {
+              uri_path {}
+            }
+
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              ip_set_reference_statement {
+                arn = aws_wafv2_ip_set.security_admin.arn
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.name_prefix}-restrict-security-api"
       sampled_requests_enabled   = true
     }
   }

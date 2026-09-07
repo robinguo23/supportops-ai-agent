@@ -17,6 +17,7 @@ This directory defines the AWS deployment foundation for SupportOps with Terrafo
 - A custom per-IP rate limit scoped to `/chat`
 - Blocked-request WAF logs with authorization and cookie headers redacted
 - A CloudWatch security dashboard for WAF metrics and recent blocked events
+- A read-only application security API protected by a default-deny WAF IP allowlist
 - CloudWatch application and PostgreSQL logs
 - A least-privilege GitHub Actions OIDC role that can push only to the two application repositories
 
@@ -50,4 +51,4 @@ terraform validate
 
 The backend receives the RDS host as environment configuration and the generated username/password through ECS secret injection. A full `DATABASE_URL` remains available as an optional override.
 
-HTTPS, remote Terraform state, automated ECS rollout, and the React security operations view are intentionally added in later stages.
+HTTPS, remote Terraform state, and automated ECS rollout are intentionally added in later stages.

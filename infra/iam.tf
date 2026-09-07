@@ -45,3 +45,29 @@ resource "aws_iam_role" "frontend_task" {
   name               = "${local.name_prefix}-frontend-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_execution_assume_role.json
 }
+
+data "aws_iam_policy_document" "backend_security_observability" {
+  statement {
+    sid       = "ReadWafMetrics"
+    actions   = ["cloudwatch:GetMetricStatistics"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "ReadSanitizedWafEvents"
+    actions   = ["logs:FilterLogEvents"]
+    resources = [aws_cloudwatch_log_group.waf.arn]
+  }
+
+  statement {
+    sid       = "ReadWebAclConfiguration"
+    actions   = ["wafv2:GetWebACL"]
+    resources = [aws_wafv2_web_acl.application.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "backend_security_observability" {
+  name   = "${local.name_prefix}-security-observability"
+  role   = aws_iam_role.backend_task.id
+  policy = data.aws_iam_policy_document.backend_security_observability.json
+}
