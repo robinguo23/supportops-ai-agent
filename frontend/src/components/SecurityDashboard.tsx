@@ -29,9 +29,53 @@ type WafEvent = {
   country: string;
 };
 
+type SecurityData = {
+  summary: SecuritySummary;
+  rules: WafRule[];
+  events: WafEvent[];
+};
+
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-GB").format(value);
+}
+
+
+function errorMessage(error: unknown) {
+  return error instanceof Error && error.message === "ACCESS_DENIED"
+    ? "Security data is restricted to a trusted administrator IP."
+    : "Security data is unavailable until the AWS deployment is configured.";
+}
+
+
+async function fetchSecurityData(): Promise<SecurityData> {
+  const [summaryResponse, rulesResponse, eventsResponse] = await Promise.all([
+    fetch(`${API_BASE_URL}/security-api/summary`),
+    fetch(`${API_BASE_URL}/security-api/rules`),
+    fetch(`${API_BASE_URL}/security-api/events?limit=20`),
+  ]);
+
+  const responses = [summaryResponse, rulesResponse, eventsResponse];
+
+  if (responses.some((response) => response.status === 403)) {
+    throw new Error("ACCESS_DENIED");
+  }
+
+  if (responses.some((response) => !response.ok)) {
+    throw new Error("UNAVAILABLE");
+  }
+
+  const [summary, rulesData, eventsData] = await Promise.all([
+    summaryResponse.json() as Promise<SecuritySummary>,
+    rulesResponse.json() as Promise<{ rules: WafRule[] }>,
+    eventsResponse.json() as Promise<{ events: WafEvent[] }>,
+  ]);
+
+  return {
+    summary,
+    rules: rulesData.rules,
+    events: eventsData.events,
+  };
 }
 
 
@@ -39,60 +83,59 @@ export default function SecurityDashboard() {
   const [summary, setSummary] = useState<SecuritySummary | null>(null);
   const [rules, setRules] = useState<WafRule[]>([]);
   const [events, setEvents] = useState<WafEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  async function loadSecurityData() {
+  function applySecurityData(data: SecurityData) {
+    setSummary(data.summary);
+    setRules(data.rules);
+    setEvents(data.events);
+  }
+
+  function clearSecurityData() {
+    setSummary(null);
+    setRules([]);
+    setEvents([]);
+  }
+
+  async function refreshSecurityData() {
     setIsLoading(true);
-    setErrorMessage("");
+    setLoadError("");
 
     try {
-      const [summaryResponse, rulesResponse, eventsResponse] =
-        await Promise.all([
-          fetch(`${API_BASE_URL}/security-api/summary`),
-          fetch(`${API_BASE_URL}/security-api/rules`),
-          fetch(`${API_BASE_URL}/security-api/events?limit=20`),
-        ]);
-
-      const responses = [summaryResponse, rulesResponse, eventsResponse];
-      const deniedResponse = responses.find(
-        (response) => response.status === 403
-      );
-
-      if (deniedResponse) {
-        throw new Error("ACCESS_DENIED");
-      }
-
-      if (responses.some((response) => !response.ok)) {
-        throw new Error("UNAVAILABLE");
-      }
-
-      const [summaryData, rulesData, eventsData] = await Promise.all([
-        summaryResponse.json() as Promise<SecuritySummary>,
-        rulesResponse.json() as Promise<{ rules: WafRule[] }>,
-        eventsResponse.json() as Promise<{ events: WafEvent[] }>,
-      ]);
-
-      setSummary(summaryData);
-      setRules(rulesData.rules);
-      setEvents(eventsData.events);
+      applySecurityData(await fetchSecurityData());
     } catch (error) {
-      setSummary(null);
-      setRules([]);
-      setEvents([]);
-
-      setErrorMessage(
-        error instanceof Error && error.message === "ACCESS_DENIED"
-          ? "Security data is restricted to a trusted administrator IP."
-          : "Security data is unavailable until the AWS deployment is configured."
-      );
+      clearSecurityData();
+      setLoadError(errorMessage(error));
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    void loadSecurityData();
+    let isCurrent = true;
+
+    void fetchSecurityData()
+      .then((data) => {
+        if (isCurrent) {
+          applySecurityData(data);
+        }
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          clearSecurityData();
+          setLoadError(errorMessage(error));
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, []);
 
   return (
@@ -107,15 +150,15 @@ export default function SecurityDashboard() {
 
         <button
           type="button"
-          onClick={() => void loadSecurityData()}
+          onClick={() => void refreshSecurityData()}
           disabled={isLoading}
         >
           {isLoading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      {errorMessage && (
-        <div className="security-access-note">{errorMessage}</div>
+      {loadError && (
+        <div className="security-access-note">{loadError}</div>
       )}
 
       {summary && (
