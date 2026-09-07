@@ -1,3 +1,16 @@
 aws_region   = "eu-west-2"
 project_name = "supportops"
 environment  = "dev"
+
+vpc_cidr         = "10.20.0.0/16"
+alb_ingress_cidrs = ["0.0.0.0/0"]
+image_tag         = "bootstrap"
+
+# Leave both at zero until the ECR images and backend secrets are ready.
+frontend_desired_count = 0
+backend_desired_count  = 0
+
+# Store real values in AWS Secrets Manager. Reference only their ARNs here.
+# database_url_secret_arn     = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/database-url"
+# gemini_api_key_secret_arn   = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/gemini-api-key"
+# deepseek_api_key_secret_arn = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/deepseek-api-key"
