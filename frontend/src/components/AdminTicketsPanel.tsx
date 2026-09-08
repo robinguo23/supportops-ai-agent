@@ -6,13 +6,18 @@ function AdminTicketsPanel() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
   const [ticketErrorMessage, setTicketErrorMessage] = useState("");
+  const [adminApiKey, setAdminApiKey] = useState("");
 
   async function fetchTickets() {
     setIsLoadingTickets(true);
     setTicketErrorMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tickets`);
+      const response = await fetch(`${API_BASE_URL}/tickets`, {
+        headers: adminApiKey
+          ? { "X-Admin-API-Key": adminApiKey }
+          : undefined,
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch tickets");
@@ -35,6 +40,9 @@ function AdminTicketsPanel() {
         `${API_BASE_URL}/tickets/${ticketId}/status?status=resolved`,
         {
           method: "PATCH",
+          headers: adminApiKey
+            ? { "X-Admin-API-Key": adminApiKey }
+            : undefined,
         }
       );
 
@@ -51,7 +59,19 @@ function AdminTicketsPanel() {
   return (
     <section className="admin-panel">
       <div className="admin-header">
-        <h2>Admin Tickets</h2>
+        <div>
+          <h2>Admin Tickets</h2>
+          <label>
+            Admin API key
+            <input
+              type="password"
+              value={adminApiKey}
+              onChange={(event) => setAdminApiKey(event.target.value)}
+              placeholder="Enter admin key"
+              autoComplete="off"
+            />
+          </label>
+        </div>
         <button onClick={fetchTickets} disabled={isLoadingTickets}>
           {isLoadingTickets ? "Loading..." : "Refresh Tickets"}
         </button>
