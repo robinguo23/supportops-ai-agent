@@ -1,3 +1,5 @@
+import os
+
 import app.api.chat as chat_api
 
 from fastapi.testclient import TestClient
@@ -7,6 +9,8 @@ from app.main import app
 
 
 client = TestClient(app)
+os.environ["ADMIN_API_KEY"] = "test-admin-key"
+ADMIN_HEADERS = {"X-Admin-API-Key": "test-admin-key"}
 
 
 def mock_vector_search(
@@ -240,8 +244,14 @@ def test_escalation_endpoint_creates_ticket():
     assert "ticket_id" in data["ticket"]
 
 
-def test_list_tickets_returns_ticket_list():
+def test_list_tickets_requires_admin_api_key():
     response = client.get("/tickets")
+
+    assert response.status_code == 401
+
+
+def test_list_tickets_returns_ticket_list():
+    response = client.get("/tickets", headers=ADMIN_HEADERS)
 
     assert response.status_code == 200
 
@@ -267,6 +277,7 @@ def test_update_ticket_status_to_resolved():
     update_response = client.patch(
         f"/tickets/{ticket_id}/status",
         params={"status": "resolved"},
+        headers=ADMIN_HEADERS,
     )
 
     assert update_response.status_code == 200
