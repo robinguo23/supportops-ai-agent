@@ -11,6 +11,7 @@ dist/
 build/
 
 # Terraform
+.terraform-bin/
 infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.*
