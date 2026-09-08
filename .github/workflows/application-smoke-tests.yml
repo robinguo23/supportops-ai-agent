@@ -1,0 +1,37 @@
+name: Application smoke tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: SupportOps URL owned by you, including https:// or http://
+        required: true
+        type: string
+      ownership_confirmation:
+        description: Type I_OWN_THIS_TARGET to authorize controlled test requests
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-smoke-tests
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Verify application health and access controls
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Run application smoke tests
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          OWNERSHIP_CONFIRMATION: ${{ inputs.ownership_confirmation }}
+        run: |
+          python security-tests/run_application_smoke_tests.py             --target-url "$TARGET_URL"             --confirmation "$OWNERSHIP_CONFIRMATION"
