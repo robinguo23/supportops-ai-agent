@@ -161,6 +161,13 @@ variable "enable_deletion_protection" {
   default     = false
 }
 
+variable "acm_certificate_arn" {
+  description = "Optional ACM certificate ARN; enables HTTPS and redirects HTTP"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "github_repository" {
   description = "GitHub repository allowed to publish application images"
   type        = string
