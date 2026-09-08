@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.answer_generation_service import generate_support_answer
 from app.services.embedding_service import generate_query_embedding
+from app.security import require_admin_api_key
 from app.tools.knowledge_chunk_tools import (
     search_knowledge_chunks,
     search_knowledge_chunks_by_embedding,
@@ -325,7 +326,7 @@ def escalate_to_human(
     }
 
 
-@router.get("/tickets")
+@router.get("/tickets", dependencies=[Depends(require_admin_api_key)])
 def list_tickets(db: Session = Depends(get_db)):
     tickets = (
         db.query(SupportTicket)
@@ -338,7 +339,7 @@ def list_tickets(db: Session = Depends(get_db)):
     }
 
 
-@router.patch("/tickets/{ticket_id}/status")
+@router.patch("/tickets/{ticket_id}/status", dependencies=[Depends(require_admin_api_key)])
 def update_ticket_status(
     ticket_id: str,
     status: str,
