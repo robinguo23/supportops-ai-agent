@@ -30,7 +30,7 @@ output "alb_dns_name" {
 
 output "application_url" {
   description = "HTTP URL for the SupportOps application before HTTPS is configured"
-  value       = "http://${aws_lb.application.dns_name}"
+  value       = var.acm_certificate_arn == null ? "http://${aws_lb.application.dns_name}" : "https://${aws_lb.application.dns_name}"
 }
 
 output "backend_ecr_repository_url" {
