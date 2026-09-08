@@ -18,6 +18,7 @@ This directory defines the AWS deployment foundation for SupportOps with Terrafo
 - Blocked-request WAF logs with authorization and cookie headers redacted
 - A CloudWatch security dashboard for WAF metrics and recent blocked events
 - A read-only application security API protected by a default-deny WAF IP allowlist
+- Admin ticket listing and status updates protected by an optional Secrets Manager API key
 - CloudWatch application and PostgreSQL logs
 - A least-privilege GitHub Actions OIDC role that can push only to the two application repositories
 
@@ -71,9 +72,10 @@ GitHub Actions uses the same pinned Terraform version for formatting and validat
 7. Verify the frontend and backend target groups are healthy.
 8. Open the `application_url` output.
 9. Run the controlled WAF regression workflow.
-10. Set both desired counts back to zero when the demo is complete.
+10. Run the Application smoke tests workflow.
+11. Set both desired counts back to zero when the demo is complete.
 
-The backend receives the RDS host as environment configuration and the generated username/password through ECS secret injection. A full `DATABASE_URL` remains available as an optional override.
+The backend receives the RDS host as environment configuration and the generated username/password through ECS secret injection. A full `DATABASE_URL` remains available as an optional override. Set `admin_api_key_secret_arn` to protect ticket listing and status updates; when it is unset, those endpoints deny access by default.
 
 ## Security regression coverage
 
@@ -88,6 +90,8 @@ The WAF regression suite requires an explicit ownership confirmation and checks:
 - repeated requests to `/chat` trigger the configured rate-based rule.
 
 The rate-limit test is intentionally controlled and should only be run against an endpoint you own.
+
+The application smoke workflow checks backend health, database connectivity, the out-of-scope chat guardrail, and unauthenticated ticket access. It does not create or modify tickets.
 
 ## Future infrastructure improvements
 
