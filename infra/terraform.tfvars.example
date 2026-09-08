@@ -20,6 +20,9 @@ database_backup_retention_days = 1
 database_deletion_protection   = false
 database_skip_final_snapshot   = true
 
+# Optional: set an ACM certificate ARN to enable HTTPS and redirect HTTP.
+# acm_certificate_arn = "arn:aws:acm:eu-west-2:123456789012:certificate/..."
+
 # Store optional AI API keys in AWS Secrets Manager and reference only their ARNs.
 # gemini_api_key_secret_arn   = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/gemini-api-key"
 # deepseek_api_key_secret_arn = "arn:aws:secretsmanager:eu-west-2:123456789012:secret:supportops/deepseek-api-key"
