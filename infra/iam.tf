@@ -20,8 +20,6 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
 }
 
 data "aws_iam_policy_document" "application_secrets" {
-  count = length(local.application_secret_arns) > 0 ? 1 : 0
-
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = local.application_secret_arns
@@ -29,11 +27,9 @@ data "aws_iam_policy_document" "application_secrets" {
 }
 
 resource "aws_iam_role_policy" "application_secrets" {
-  count = length(local.application_secret_arns) > 0 ? 1 : 0
-
   name   = "${local.name_prefix}-application-secrets"
   role   = aws_iam_role.ecs_task_execution.id
-  policy = data.aws_iam_policy_document.application_secrets[0].json
+  policy = data.aws_iam_policy_document.application_secrets.json
 }
 
 resource "aws_iam_role" "backend_task" {
