@@ -136,6 +136,13 @@ variable "deepseek_api_key_secret_arn" {
   nullable    = true
 }
 
+variable "admin_api_key_secret_arn" {
+  description = "Optional Secrets Manager ARN containing the admin ticket API key"
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "cors_allowed_origins" {
   description = "Comma-separated origins allowed by the FastAPI CORS middleware"
   type        = string
