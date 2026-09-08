@@ -11,6 +11,18 @@ resource "aws_security_group" "alb" {
     cidr_blocks = var.alb_ingress_cidrs
   }
 
+  dynamic "ingress" {
+    for_each = var.acm_certificate_arn == null ? [] : [1]
+
+    content {
+      description = "Public HTTPS"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = var.alb_ingress_cidrs
+    }
+  }
+
   egress {
     description = "Forward traffic to ECS tasks"
     from_port   = 0
@@ -132,6 +144,31 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
+    type             = var.acm_certificate_arn == null ? "forward" : "redirect"
+    target_group_arn = var.acm_certificate_arn == null ? aws_lb_target_group.frontend.arn : null
+
+    dynamic "redirect" {
+      for_each = var.acm_certificate_arn == null ? [] : [1]
+
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count = var.acm_certificate_arn == null ? 0 : 1
+
+  load_balancer_arn = aws_lb.application.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.acm_certificate_arn
+
+  default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
   }
@@ -139,6 +176,25 @@ resource "aws_lb_listener" "http" {
 
 resource "aws_lb_listener_rule" "backend" {
   listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/chat", "/tickets*", "/knowledge*", "/db/*", "/security-api*"]
+    }
+  }
+}
+
+
+resource "aws_lb_listener_rule" "backend_https" {
+  count = var.acm_certificate_arn == null ? 0 : 1
+
+  listener_arn = aws_lb_listener.https[0].arn
   priority     = 10
 
   action {
