@@ -132,6 +132,12 @@ resource "aws_ecs_task_definition" "backend" {
             name      = "DEEPSEEK_API_KEY"
             valueFrom = var.deepseek_api_key_secret_arn
           }
+        ],
+        var.admin_api_key_secret_arn == null ? [] : [
+          {
+            name      = "ADMIN_API_KEY"
+            valueFrom = var.admin_api_key_secret_arn
+          }
         ]
       )
 
