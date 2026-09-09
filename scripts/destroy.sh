@@ -31,7 +31,7 @@ elif [[ "$CREATE_SNAPSHOT" != "false" ]]; then
 fi
 
 cd "${ROOT_DIR}/infra"
-"$TERRAFORM" init -input=false
-"$TERRAFORM" plan -destroy -input=false -out="$DESTROY_PLAN"
+bash "$TERRAFORM" init -input=false
+bash "$TERRAFORM" plan -destroy -input=false -out="$DESTROY_PLAN"
 echo "Review the destroy plan above."
-"$TERRAFORM" apply "$DESTROY_PLAN"
+bash "$TERRAFORM" apply "$DESTROY_PLAN"
