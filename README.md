@@ -207,16 +207,6 @@ Secrets are stored in Secrets Manager and injected into ECS tasks at runtime. Co
 
 This is a demonstration environment. RDS, ALB, WAF and CloudWatch resources can continue to incur charges even when ECS desired counts are zero. Destroy the environment when it is not needed.
 
-## Current limitations
-
-- HTTP by default; HTTPS requires an ACM certificate ARN
-- single development environment
-- no full user authentication system
-- manually managed trusted administrator IP
-- limited retrieval evaluation data
-- no production-scale availability or disaster-recovery design
-- no automated database migration pipeline
-
-## Interview summary
+## summary
 
 > I built a containerised FastAPI and React support application and deployed it with Terraform to AWS. I protected the ALB with AWS WAF managed rule groups, custom rate limiting and IP restrictions for sensitive security data. WAF logs are sent to CloudWatch and exposed through a restricted security dashboard. GitHub Actions uses OIDC and immutable ECR image tags. I wrote controlled Python regression tests covering SQL injection, XSS, path traversal, bad input, access control and rate limiting, including the delayed evaluation behaviour of AWS WAF rate-based rules.
