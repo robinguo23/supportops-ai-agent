@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import sys
 import time
 import urllib.error
@@ -10,6 +11,8 @@ from urllib.parse import urljoin
 
 CONFIRMATION = "I_OWN_THIS_TARGET"
 RATE_LIMIT_REQUESTS = 105
+RATE_LIMIT_POLL_SECONDS = 5
+RATE_LIMIT_WAIT_SECONDS = int(os.getenv("WAF_RATE_LIMIT_WAIT_SECONDS", "90"))
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ TEST_CASES = (
 def request_status(url: str) -> int:
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "supportops-security-regression/1.1"},
+        headers={"User-Agent": "supportops-security-regression/1.2"},
     )
 
     try:
@@ -59,8 +62,6 @@ def request_status(url: str) -> int:
 
 
 def run_rate_limit_test(target_url: str) -> bool:
-    blocked_at = None
-
     for request_number in range(1, RATE_LIMIT_REQUESTS + 1):
         try:
             status = request_status(urljoin(target_url, "chat"))
@@ -69,25 +70,43 @@ def run_rate_limit_test(target_url: str) -> bool:
             return False
 
         if status == 403:
-            blocked_at = request_number
-            break
+            print(
+                "PASS Chat rate limit: observed 403 after "
+                f"{request_number} requests"
+            )
+            return True
 
-        # Avoid creating a burst that is unnecessarily aggressive. The WAF
-        # rule aggregates requests over a five-minute window.
         time.sleep(0.02)
 
-    if blocked_at is None:
-        print(
-            "FAIL Chat rate limit: no 403 observed after "
-            f"{RATE_LIMIT_REQUESTS} requests"
-        )
-        return False
+    print(
+        "Rate threshold reached; waiting for AWS WAF rate-based evaluation "
+        f"for up to {RATE_LIMIT_WAIT_SECONDS}s."
+    )
+
+    deadline = time.monotonic() + RATE_LIMIT_WAIT_SECONDS
+    polls = 0
+
+    while time.monotonic() < deadline:
+        time.sleep(RATE_LIMIT_POLL_SECONDS)
+        polls += 1
+        try:
+            status = request_status(urljoin(target_url, "chat"))
+        except (OSError, urllib.error.URLError) as error:
+            print(f"FAIL Chat rate limit: polling error: {error}")
+            return False
+
+        if status == 403:
+            print(
+                "PASS Chat rate limit: observed 403 after threshold "
+                f"and {polls} poll(s)"
+            )
+            return True
 
     print(
-        "PASS Chat rate limit: observed 403 after "
-        f"{blocked_at} requests"
+        "FAIL Chat rate limit: no 403 observed after threshold and "
+        f"{RATE_LIMIT_WAIT_SECONDS}s of polling"
     )
-    return True
+    return False
 
 
 def main() -> int:
