@@ -11,10 +11,10 @@ cd "${ROOT_DIR}/infra"
 
 case "$MODE" in
   plan)
-    "$TERRAFORM" init -input=false
-    "$TERRAFORM" fmt -check -recursive
-    "$TERRAFORM" validate -no-color
-    "$TERRAFORM" plan -input=false -out="$PLAN_FILE"
+    bash "$TERRAFORM" init -input=false
+    bash "$TERRAFORM" fmt -check -recursive
+    bash "$TERRAFORM" validate -no-color
+    bash "$TERRAFORM" plan -input=false -out="$PLAN_FILE"
     echo "Plan saved to $PLAN_FILE"
     ;;
   apply)
@@ -22,14 +22,14 @@ case "$MODE" in
       echo "No saved plan found. Run: bash scripts/deploy.sh plan" >&2
       exit 1
     fi
-    "$TERRAFORM" apply "$PLAN_FILE"
+    bash "$TERRAFORM" apply "$PLAN_FILE"
     ;;
   up)
-    "$TERRAFORM" init -input=false
-    "$TERRAFORM" fmt -check -recursive
-    "$TERRAFORM" validate -no-color
-    "$TERRAFORM" plan -input=false -out="$PLAN_FILE"
-    "$TERRAFORM" apply "$PLAN_FILE"
+    bash "$TERRAFORM" init -input=false
+    bash "$TERRAFORM" fmt -check -recursive
+    bash "$TERRAFORM" validate -no-color
+    bash "$TERRAFORM" plan -input=false -out="$PLAN_FILE"
+    bash "$TERRAFORM" apply "$PLAN_FILE"
     ;;
   *)
     echo "Usage: bash scripts/deploy.sh [plan|apply|up]" >&2
