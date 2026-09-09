@@ -109,10 +109,16 @@ def main() -> int:
         passed = status in test_case.expected_statuses
 
         if test_case.name == "Backend health" and passed:
-            passed = response_body in ("ok", {"status": "ok"})
+            passed = (
+                isinstance(response_body, str)
+                and response_body.strip() == "ok"
+            ) or response_body == {"status": "ok"}
 
         if test_case.name == "Database health" and passed:
-            passed = isinstance(response_body, dict) and response_body.get("status") == "ok"
+            passed = (
+                isinstance(response_body, dict)
+                and response_body.get("status") == "ok"
+            )
 
         if test_case.name == "Out-of-scope chat guardrail" and passed:
             passed = (
