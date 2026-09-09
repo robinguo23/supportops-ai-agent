@@ -20,7 +20,16 @@ class TestCase:
     body: dict | None = None
 
 
-def request(target_url: str, test_case: TestCase) -> tuple[int, dict | None]:
+def parse_response_body(raw_body: str) -> dict | str | None:
+    if not raw_body:
+        return None
+    try:
+        return json.loads(raw_body)
+    except json.JSONDecodeError:
+        return raw_body
+
+
+def request(target_url: str, test_case: TestCase) -> tuple[int, dict | str | None]:
     url = urljoin(target_url, test_case.path.lstrip("/"))
     body = (
         json.dumps(test_case.body).encode("utf-8")
@@ -29,7 +38,7 @@ def request(target_url: str, test_case: TestCase) -> tuple[int, dict | None]:
     )
 
     headers = {
-        "Accept": "application/json",
+        "Accept": "application/json, text/plain",
         "User-Agent": "supportops-application-smoke/1.0",
     }
 
@@ -46,14 +55,10 @@ def request(target_url: str, test_case: TestCase) -> tuple[int, dict | None]:
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             raw_body = response.read().decode("utf-8")
-            return response.status, json.loads(raw_body) if raw_body else None
+            return response.status, parse_response_body(raw_body)
     except urllib.error.HTTPError as error:
         raw_body = error.read().decode("utf-8")
-        try:
-            parsed_body = json.loads(raw_body) if raw_body else None
-        except json.JSONDecodeError:
-            parsed_body = None
-        return error.code, parsed_body
+        return error.code, parse_response_body(raw_body)
 
 
 def main() -> int:
@@ -102,6 +107,12 @@ def main() -> int:
             continue
 
         passed = status in test_case.expected_statuses
+
+        if test_case.name == "Backend health" and passed:
+            passed = response_body in ("ok", {"status": "ok"})
+
+        if test_case.name == "Database health" and passed:
+            passed = isinstance(response_body, dict) and response_body.get("status") == "ok"
 
         if test_case.name == "Out-of-scope chat guardrail" and passed:
             passed = (
